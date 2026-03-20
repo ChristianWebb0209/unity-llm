@@ -4,6 +4,7 @@ using System.IO;
 using System.Text.Json;
 using UnityLLM.Editor.Architecture.Model;
 
+#nullable enable
 namespace UnityLLM.Editor.Stores
 {
     public sealed class PluginStateStore

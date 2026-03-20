@@ -6,6 +6,7 @@ using System.Threading.Tasks;
 using UnityLLM.Editor.Architecture.Model;
 using UnityLLM.Editor.Backend;
 
+#nullable enable
 namespace UnityLLM.Editor.Architecture.Controller
 {
     /// <summary>

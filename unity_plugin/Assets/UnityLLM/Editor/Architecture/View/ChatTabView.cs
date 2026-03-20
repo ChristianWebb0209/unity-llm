@@ -1,5 +1,6 @@
 using System;
 using System.Text;
+using UnityEngine;
 using UnityEngine.UIElements;
 
 namespace UnityLLM.Editor.Architecture.View

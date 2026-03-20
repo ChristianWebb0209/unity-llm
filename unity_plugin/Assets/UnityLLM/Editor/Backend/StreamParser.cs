@@ -4,6 +4,7 @@ using System.Text;
 using System.Text.Json;
 using UnityLLM.Editor.Backend;
 
+#nullable enable
 namespace UnityLLM.Editor.Backend
 {
     /// <summary>

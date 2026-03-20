@@ -122,6 +122,45 @@
     }
   },
   {
+    "name": "create_script",
+    "description": "Create a new C# script file at a path under Assets/. Generates a minimal Unity MonoBehaviour skeleton and inserts initial_content into the class body (V1).",
+    "parameters": {
+      "type": "object",
+      "properties": {
+        "path": {
+          "type": "string",
+          "description": "Project-relative path, e.g. Assets/Scripts/MyBehaviour.cs"
+        },
+        "language": {
+          "type": "string",
+          "description": "V1 supports only csharp.",
+          "enum": [
+            "csharp"
+          ],
+          "default": "csharp"
+        },
+        "extends_class": {
+          "type": "string",
+          "description": "Base class for the generated MonoBehaviour.",
+          "default": "MonoBehaviour"
+        },
+        "initial_content": {
+          "type": "string",
+          "description": "Body content inserted into the class body.",
+          "default": ""
+        },
+        "template": {
+          "type": "string",
+          "description": "Optional template selector (V1 stub). Leave empty unless you add templates later.",
+          "default": ""
+        }
+      },
+      "required": [
+        "path"
+      ]
+    }
+  },
+  {
     "name": "list_directory",
     "description": "List files/folders under a directory in the Unity project.",
     "parameters": {

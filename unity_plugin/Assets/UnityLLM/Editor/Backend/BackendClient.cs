@@ -6,6 +6,7 @@ using System.Text.Json;
 using System.Threading;
 using System.Threading.Tasks;
 
+#nullable enable
 namespace UnityLLM.Editor.Backend
 {
     /// <summary>
@@ -137,8 +138,11 @@ namespace UnityLLM.Editor.Backend
             using var resp = await _http.SendAsync(req, HttpCompletionOption.ResponseHeadersRead, cancellationToken);
             resp.EnsureSuccessStatusCode();
 
-            using var stream = await resp.Content.ReadAsStreamAsync(cancellationToken);
-            using var reader = new System.IO.StreamReader(stream, Encoding.UTF8);
+            // Unity/Editor API compatibility: some profiles don’t provide the
+            // ReadAsStreamAsync(CancellationToken) overload and may not provide
+            // StreamReader(Stream, Encoding) either. Use the parameterless overloads.
+            using var stream = await resp.Content.ReadAsStreamAsync();
+            using var reader = new System.IO.StreamReader(stream);
 
             char[] buf = new char[1024];
             while (true)
@@ -183,8 +187,8 @@ namespace UnityLLM.Editor.Backend
             using var resp = await _http.SendAsync(req, HttpCompletionOption.ResponseHeadersRead, cancellationToken);
             resp.EnsureSuccessStatusCode();
 
-            using var stream = await resp.Content.ReadAsStreamAsync(cancellationToken);
-            using var reader = new System.IO.StreamReader(stream, Encoding.UTF8);
+            using var stream = await resp.Content.ReadAsStreamAsync();
+            using var reader = new System.IO.StreamReader(stream);
 
             char[] buf = new char[1024];
             while (true)
@@ -218,8 +222,8 @@ namespace UnityLLM.Editor.Backend
             using var resp = await _http.SendAsync(req, HttpCompletionOption.ResponseHeadersRead, cancellationToken);
             resp.EnsureSuccessStatusCode();
 
-            using var stream = await resp.Content.ReadAsStreamAsync(cancellationToken);
-            using var reader = new System.IO.StreamReader(stream, Encoding.UTF8);
+            using var stream = await resp.Content.ReadAsStreamAsync();
+            using var reader = new System.IO.StreamReader(stream);
 
             var parser = new StreamParser();
             parser.OnAnswerDelta += onAnswerDelta;

@@ -1,6 +1,7 @@
 using UnityEngine.UIElements;
 using UnityLLM.Editor.Architecture.Model;
 
+#nullable enable
 namespace UnityLLM.Editor.Architecture.View
 {
     public sealed class TimelineTabView

@@ -12,6 +12,7 @@ using UnityEngine.Events;
 using UnityLLM.Editor.Architecture.Model;
 using UnityLLM.Editor.Backend;
 
+#nullable enable
 namespace UnityLLM.Editor.Tools.Executors
 {
     public sealed class SceneStubExecutors : IToolExecutor

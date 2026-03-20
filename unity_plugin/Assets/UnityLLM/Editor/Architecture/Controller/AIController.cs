@@ -6,6 +6,7 @@ using UnityLLM.Editor.Backend;
 using UnityLLM.Editor.Stores;
 using UnityLLM.Editor.Tools;
 
+#nullable enable
 namespace UnityLLM.Editor.Architecture.Controller
 {
     public sealed class AIController
