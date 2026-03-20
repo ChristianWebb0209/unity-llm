@@ -69,6 +69,8 @@ def main() -> None:
         for e in f.get("errors") or []:
             if str(e).startswith("unknown_tool:"):
                 blocking_errors.append(str(e))
+            if str(e).startswith("tool_not_in_contract:"):
+                blocking_errors.append(str(e))
             if str(e) in ("tool_calls_not_list", "tool_call_not_object", "arguments_not_object"):
                 blocking_errors.append(str(e))
             if str(e) in ("agent_no_tool_calls", "ask_has_tool_calls", "ask_answer_not_question"):

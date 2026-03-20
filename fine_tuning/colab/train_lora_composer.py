@@ -92,26 +92,31 @@ def _refresh_paths_from_cwd() -> None:
 def _maybe_setup_colab_repo_and_drive() -> None:
     """
     In Colab:
-    - clone/update repo to latest origin/master
-    - chdir into /content/godot-llm
+    - optionally clone/update repo
+    - chdir into a Colab repo directory
     - mount Drive and set default output directories
     """
     if not Path("/content").exists():
         return
 
-    repo_dir = Path("/content/godot-llm").resolve()
-    if not repo_dir.exists():
-        _run(
-            [
-                "git",
-                "clone",
-                "https://github.com/ChristianWebb0209/godot-llm.git",
-                str(repo_dir),
-            ]
-        )
+    repo_dir = Path(os.environ.get("COLAB_REPO_DIR", "/content/unity-llm")).resolve()
 
-    _run(["git", "fetch", "origin"], cwd=repo_dir)
-    _run(["git", "reset", "--hard", "origin/master"], cwd=repo_dir)
+    if not repo_dir.exists():
+        clone_url = os.environ.get("REPO_CLONE_URL", "").strip()
+        if not clone_url:
+            raise SystemExit(
+                f"Colab repo not found at {repo_dir}. Set REPO_CLONE_URL to enable auto-clone, "
+                "or ensure the repo is already present in the runtime."
+            )
+        _run(["git", "clone", clone_url, str(repo_dir)])
+
+    # If repo exists and has a remote, try to update; otherwise continue.
+    try:
+        _run(["git", "fetch", "origin"], cwd=repo_dir)
+        _run(["git", "reset", "--hard", "origin/master"], cwd=repo_dir)
+    except Exception:
+        pass
+
     os.chdir(repo_dir)
     _refresh_paths_from_cwd()
 
@@ -119,7 +124,7 @@ def _maybe_setup_colab_repo_and_drive() -> None:
         from google.colab import drive  # type: ignore
 
         drive.mount("/content/drive", force_remount=False)
-        base_dir = Path("/content/drive/MyDrive/godot-composer-v3-runs")
+        base_dir = Path(os.environ.get("DRIVE_BASE_DIR", "/content/drive/MyDrive/unity-composer-v3-runs"))
         checkpoint_dir = base_dir / "checkpoints"
         output_adapter_dir = base_dir / "adapter"
         model_cache_dir = base_dir / "models"
@@ -294,7 +299,7 @@ def load_tokenizer_and_model() -> tuple[AutoTokenizer, AutoModelForCausalLM]:
 
 
 def build_trainer(tokenizer: AutoTokenizer, model: AutoModelForCausalLM, dataset: DatasetDict) -> SFTTrainer:
-    output_dir = os.environ.get("CHECKPOINT_DIR", "./godot-composer-v2-lora")
+    output_dir = os.environ.get("CHECKPOINT_DIR", "./unity-composer-v1-lora")
 
     training_args = TrainingArguments(
         output_dir=output_dir,
@@ -354,7 +359,7 @@ def main() -> None:
 
     trainer.train()
 
-    save_dir = os.environ.get("OUTPUT_ADAPTER_DIR", "godot-composer-v2-adapter")
+    save_dir = os.environ.get("OUTPUT_ADAPTER_DIR", "unity-composer-v1-adapter")
     trainer.model.save_pretrained(save_dir)
     tokenizer.save_pretrained(save_dir)
     print(f"Saved adapter to: {save_dir}")

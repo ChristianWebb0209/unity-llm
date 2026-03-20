@@ -14,12 +14,7 @@
     "append_to_file",
     "apply_patch",
     "delete_file",
-    "list_directory",
-    "list_files",
-    "search_files",
-    "grep_search",
-    "project_structure",
-    "find_references_to",
+    "create_script",
     "open_scene",
     "save_scene",
     "get_scene_hierarchy",
@@ -30,8 +25,6 @@
     "set_component_property",
     "connect_ui_event",
     "collect_compile_errors",
-    "run_unity_editor_tests",
-    "fetch_url",
-    "run_terminal_command"
+    "run_unity_editor_tests"
   ]
 }

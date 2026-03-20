@@ -22,11 +22,12 @@ from .config import COMPOSER_API_KEY, COMPOSER_BASE_URL, COMPOSER_MODEL, get_com
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
 TOOLS_JSON = REPO_ROOT / "tools.json"
+CONTRACT_JSON = REPO_ROOT / "fine_tuning" / "schemas" / "composer_v3_tool_contract.json"
 
 AGENT_PROMPTS = [
-    "Create a CharacterBody2D script that moves left and right.",
-    "Connect a button pressed signal to _on_pressed in main scene.",
-    "Read res://scripts/player.gd and patch a typo in velocity variable.",
+    "Create a C# MonoBehaviour script that moves left and right at Assets/Scripts/PlayerController.cs. Use create_script and include minimal initial_content.",
+    "Open the active scene and create a UI Button under the Canvas, then wire its onClick (m_OnClick) to a target method using connect_ui_event.",
+    "Read Assets/Scripts/PlayerController.cs and patch a typo in the code using apply_patch (old_string/new_string).",
 ]
 
 ADVERSARIAL_AGENT_PROMPTS = [
@@ -36,9 +37,9 @@ ADVERSARIAL_AGENT_PROMPTS = [
 ]
 
 ASK_PROMPTS = [
-    "Fix my script.",
-    "Connect my signal.",
-    "Create the node and wire everything up.",
+    "Fix my script. Which exact file path under Assets should I edit?",
+    "Connect my UI event. What source object path, event_property_path, and target method should I use?",
+    "Create the GameObject and wire it up. Which scene should I open (or should I use the currently open scene)?",
 ]
 
 
@@ -46,11 +47,15 @@ def _load_schema_tools() -> set[str]:
     schema = json.loads(TOOLS_JSON.read_text(encoding="utf-8"))
     return {t["name"] for t in schema if isinstance(t, dict) and t.get("name")}
 
+def _load_contract_tools() -> set[str]:
+    contract = json.loads(CONTRACT_JSON.read_text(encoding="utf-8"))
+    return set(contract.get("tools") or [])
+
 
 def _build_body(question: str, composer_mode: str) -> Dict[str, Any]:
     body: Dict[str, Any] = {
         "question": question,
-        "context": {"language": "gdscript"},
+        "context": {"language": "csharp"},
         "top_k": 8,
         "model": COMPOSER_MODEL,
         "composer_mode": composer_mode,
@@ -82,7 +87,7 @@ def _is_composer_upstream_error(resp: Dict[str, Any]) -> bool:
     return a.startswith("Composer request failed:")
 
 
-def _validate_tool_calls(tool_calls: Any, valid_tools: set[str]) -> List[str]:
+def _validate_tool_calls(tool_calls: Any, schema_tools: set[str], contract_tools: set[str]) -> List[str]:
     errs: List[str] = []
     if not isinstance(tool_calls, list):
         return ["tool_calls_not_list"]
@@ -95,8 +100,10 @@ def _validate_tool_calls(tool_calls: Any, valid_tools: set[str]) -> List[str]:
         if not isinstance(name, str) or not name:
             errs.append(f"missing_tool_name:{i}")
             continue
-        if name not in valid_tools:
+        if name not in schema_tools:
             errs.append(f"unknown_tool:{name}")
+        if name not in contract_tools:
+            errs.append(f"tool_not_in_contract:{name}")
         if not isinstance(args, dict):
             errs.append(f"arguments_not_object:{name}")
     return errs
@@ -114,7 +121,8 @@ def main() -> None:
     args = parser.parse_args()
 
     url = args.url.strip() or get_composer_url()
-    valid_tools = _load_schema_tools()
+    schema_tools = _load_schema_tools()
+    contract_tools = _load_contract_tools()
     failures: List[Dict[str, Any]] = []
     checks: List[Dict[str, Any]] = []
     upstream_error_checks = 0
@@ -134,7 +142,7 @@ def main() -> None:
             )
             continue
         tool_calls = resp.get("tool_calls")
-        errs = _validate_tool_calls(tool_calls, valid_tools)
+        errs = _validate_tool_calls(tool_calls, schema_tools, contract_tools)
         if isinstance(tool_calls, list) and len(tool_calls) == 0:
             errs.append("agent_no_tool_calls")
         checks.append({"mode": "agent", "question": q, "errors": errs})

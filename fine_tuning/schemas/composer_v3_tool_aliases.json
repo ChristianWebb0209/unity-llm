@@ -7,15 +7,15 @@
   "aliases": {
     "write_script": "write_file",
     "read_file_content": "read_file",
-    "get_node_path": "get_node_tree",
-    "search_internet": "fetch_url",
+    "get_node_path": "get_scene_hierarchy",
+    "search_internet": null,
     "create_timer": null,
     "create_signal": null,
     "export_attribute": null,
     "get_nodes_in_group": null,
     "create_script_template": "create_script",
-    "filter_by_extension": "list_files",
-    "search_script_snippets": "search_files"
+    "filter_by_extension": null,
+    "search_script_snippets": null
   },
   "notes": [
     "Null values mean no safe canonical mapping exists and examples must be rejected or regenerated.",
