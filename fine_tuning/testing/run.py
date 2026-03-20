@@ -1,5 +1,5 @@
 """
-Run test prompts against RAG (GPT-4.1-mini) and/or Godot Composer, save results for comparison.
+Run test prompts against RAG (GPT-4.1-mini) and/or Unity Composer, save results for comparison.
 Usage:
   cd fine_tuning && python -m testing.run
   cd fine_tuning && python -m testing.run --backend rag
@@ -64,7 +64,7 @@ def build_request_body(
     if base_url:
         body["base_url"] = base_url
     # Minimal context for reproducibility (no project-specific state)
-    body["context"] = {"language": "gdscript"}
+    body["context"] = {"language": "csharp"}
     return body
 
 

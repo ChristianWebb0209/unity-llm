@@ -161,7 +161,7 @@ print("Loading LoRA adapter...")
 model = PeftModel.from_pretrained(model, ADAPTER_DIR)
 model.eval()
 
-app = FastAPI(title="Godot Composer LoRA Server")
+app = FastAPI(title="Unity Composer LoRA Server")
 
 
 @app.get("/")

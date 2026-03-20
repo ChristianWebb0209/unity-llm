@@ -1,6 +1,6 @@
 """
 Test harness config: backend URLs, models, and optional credentials for
-RAG vs Godot Composer.
+RAG vs Unity Composer.
 
 The goal is to make it easy to run A/B tests between:
 - RAG (typically GPT on OpenAI)
@@ -30,7 +30,7 @@ RAG_BASE_URL: str = os.getenv("RAG_BASE_URL", "http://127.0.0.1:8000").rstrip("/
 # Model used by POST /query (RAG + agent). Server default is gpt-4.1-mini if unset.
 RAG_MODEL: Optional[str] = os.getenv("RAG_MODEL") or "gpt-4.1-mini"
 
-# Model used by POST /composer/query (fine-tuned Godot Composer).
+# Model used by POST /composer/query (fine-tuned Unity Composer).
 # This can be an OpenAI model name OR a model string accepted by your inference host.
 COMPOSER_MODEL: Optional[str] = (
     os.getenv("COMPOSER_MODEL")
@@ -38,7 +38,7 @@ COMPOSER_MODEL: Optional[str] = (
     # Fallback example (model id, optionally with '#<deployment id>' routing)
     # Safe default so tests don't require editing this file when using
     # your own OpenAI-compatible host (Vast.ai / RunPod / etc).
-    or "godot-composer"
+    or "unity-composer"
 )
 
 # Optional credentials / endpoint for Composer when hosted outside OpenAI.

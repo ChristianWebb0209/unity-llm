@@ -1,9 +1,9 @@
-# RAG Service Testing: Godot Composer vs GPT-4.1-mini
+# RAG Service Testing: Unity Composer vs GPT-4.1-mini
 
 This folder implements qualitative and quantitative comparison between:
 
 - **RAG** (`POST /query`): full RAG pipeline + tool loop, default model `gpt-4.1-mini`
-- **Godot Composer** (`POST /composer/query`): fine-tuned model that returns tool_calls directly
+- **Unity Composer** (`POST /composer/query`): fine-tuned model that returns tool_calls directly
 
 ## Prerequisites
 
@@ -12,7 +12,7 @@ This folder implements qualitative and quantitative comparison between:
    uvicorn app.main:app --reload
    ```
 2. Optional env for Composer model (if different from server default):
-   - `COMPOSER_MODEL` – model name for Composer (e.g. `godot-composer`)
+   - `COMPOSER_MODEL` – model name for Composer (e.g. `unity-composer`)
    - `RAG_MODEL` – model for RAG (default `gpt-4.1-mini`)
    - `RAG_BASE_URL` – base URL (default `http://127.0.0.1:8000`)
 
@@ -53,7 +53,7 @@ python -m testing.report testing/results/run_20250115_120000.json --summary-only
 ## What gets measured
 
 - **Tool calls**: count and validity (non-empty name, dict arguments)
-- **Code blocks**: number of ```gdscript blocks and a simple parseability check (balanced brackets)
+- **Code blocks**: number of ```csharp blocks and a simple parseability check (balanced brackets)
 - **Context usage**: from server (model, token estimates)
 
 For qualitative comparison, use the side-by-side report and/or run with `--limit` and review answers manually.
@@ -90,7 +90,7 @@ python -m testing.judge testing/results/run_20250115_120000.json --openai --out 
 
 The plugin and server already support switching:
 
-- **Plugin**: Settings → Backend profile: "RAG (OpenAI)" vs "Godot Composer". Each profile uses a different endpoint (`/query` vs `/composer/query`).
+- **Plugin**: Settings → Backend profile: "RAG (OpenAI)" vs "Unity Composer". Each profile uses a different endpoint (`/query` vs `/composer/query`).
 - **Server**: Same `QueryRequest` body for both; optional `model` in the payload overrides `OPENAI_MODEL` per request. Composer endpoint uses the same client but typically with a different model name (e.g. fine-tuned).
 
 No code changes are required to switch; use the dropdown in the plugin or call the desired endpoint from this harness.

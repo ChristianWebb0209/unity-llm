@@ -1,6 +1,0 @@
-{
-  "status": "skipped",
-  "reason": "composer_upstream_unavailable",
-  "hint": "Start rag_service and ensure COMPOSER/VASTAI base URL reaches a running LoRA server.",
-  "suite_report": "C:\\Github\\godot-llm\\fine_tuning\\testing\\results\\composer_v3_inference_contract_suite.json"
-}

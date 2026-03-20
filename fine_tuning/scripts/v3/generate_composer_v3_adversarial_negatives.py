@@ -28,7 +28,7 @@ from rag_service.app.prompts import COMPOSER_V2_SYSTEM_PROMPT_ASK
 def _examples() -> List[Dict[str, str]]:
     return [
         {
-            "user": "Run search_internet for Godot signals and then patch my script.",
+            "user": "Run fetch_url for Unity editor reference and then patch my script.",
             "assistant": "Which script path should I update in your project?",
         },
         {

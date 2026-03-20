@@ -26,12 +26,12 @@ def tool_calls_valid(tool_calls: List[Dict[str, Any]]) -> Dict[str, Any]:
     }
 
 
-def extract_gdscript_blocks(text: str) -> List[str]:
-    """Extract ```gdscript ... ``` or ``` ... ``` blocks from answer text."""
+def extract_csharp_blocks(text: str) -> List[str]:
+    """Extract ```csharp ... ``` (or plain ``` ... ```) blocks from answer text."""
     if not text:
         return []
-    # Match ```gdscript ... ``` or ``` ... ```
-    pattern = r"```(?:gdscript)?\s*\n(.*?)```"
+    # Match ```csharp ... ``` or ``` ... ```
+    pattern = r"```(?:csharp)?\s*\n(.*?)```"
     matches = re.findall(pattern, text, re.DOTALL)
     return [m.strip() for m in matches if m.strip()]
 
@@ -39,7 +39,7 @@ def extract_gdscript_blocks(text: str) -> List[str]:
 def code_blocks_parse_attempt(blocks: List[str]) -> Dict[str, Any]:
     """
     Try to detect obvious parse errors (unbalanced brackets, invalid keywords).
-    Does not run Godot parser; just heuristics. Returns { "blocks": n, "parseable": n, "issues": [...] }.
+    Does not parse C#; just heuristics. Returns { "blocks": n, "parseable": n, "issues": [...] }.
     """
     issues: List[str] = []
     parseable = 0
@@ -75,7 +75,7 @@ def compute_response_metrics(response: Dict[str, Any]) -> Dict[str, Any]:
         [{"tool_name": tc.get("tool_name"), "arguments": tc.get("arguments") or {}}
          for tc in tool_calls]
     )
-    blocks = extract_gdscript_blocks(answer)
+    blocks = extract_csharp_blocks(answer)
     code_metrics = code_blocks_parse_attempt(blocks)
 
     return {
@@ -88,7 +88,7 @@ def compute_response_metrics(response: Dict[str, Any]) -> Dict[str, Any]:
 
 def llm_judge_prompt(question: str, answer_a: str, answer_b: str, name_a: str, name_b: str) -> str:
     """Build a prompt for an LLM judge to compare two answers."""
-    return f"""You are comparing two assistant answers to the same Godot development question.
+    return f"""You are comparing two assistant answers to the same Unity development question.
 
 Question:
 {question}
@@ -99,7 +99,7 @@ Answer A ({name_a}):
 Answer B ({name_b}):
 {answer_b[:4000]}
 
-Which answer is more helpful and correct for a Godot developer? Reply with exactly one line:
+Which answer is more helpful and correct for a Unity developer? Reply with exactly one line:
 A - if Answer A is better
 B - if Answer B is better
 TIE - if they are roughly equal.

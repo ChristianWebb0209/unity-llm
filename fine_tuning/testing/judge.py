@@ -89,7 +89,7 @@ def main() -> None:
         question = rag.get("question", "")
         ans_rag = (rag.get("response") or {}).get("answer", "")
         ans_composer = (composer.get("response") or {}).get("answer", "")
-        prompt_text = llm_judge_prompt(question, ans_rag, ans_composer, "RAG (GPT-4.1-mini)", "Godot Composer")
+        prompt_text = llm_judge_prompt(question, ans_rag, ans_composer, "RAG (GPT-4.1-mini)", "Unity Composer")
         entry: Dict[str, Any] = {
             "prompt_id": pid,
             "question": question[:200],
@@ -98,7 +98,7 @@ def main() -> None:
         }
         if args.openai:
             verdict_text, judge_error = run_judge_one(
-                question, ans_rag, ans_composer, "RAG (GPT-4.1-mini)", "Godot Composer"
+                question, ans_rag, ans_composer, "RAG (GPT-4.1-mini)", "Unity Composer"
             )
             if verdict_text:
                 entry["verdict_raw"] = verdict_text

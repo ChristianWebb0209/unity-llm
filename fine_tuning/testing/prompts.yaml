@@ -1,64 +1,37 @@
-# Test prompts for Godot Composer vs GPT-4.1-mini (RAG) comparison.
+# Test prompts for Unity Composer vs GPT-4.1-mini (RAG) comparison.
 # Run: python -m testing.run (from fine_tuning) or python testing/run.py
 # Each prompt is sent to both backends; results are saved for qualitative and quantitative comparison.
 
 prompts:
-  - id: explain_signal
-    question: "How do I connect a button's pressed signal to a method in GDScript?"
+  - id: explain_ui_event
+    question: "How do I wire a Unity UI Button onClick to a C# method using UnityEvent?"
     category: explain
 
-  - id: create_character_body
-    question: "Create a simple CharacterBody2D script that moves left and right with the arrow keys."
+  - id: connect_ui_event_in_scene
+    question: "Open the current scene and connect a Button's onClick to an existing method in a C# script."
     category: code_gen
 
-  - id: fix_parse_error
-    question: "What does 'Parser Error: Expected identifier' mean in GDScript and how do I fix it?"
+  - id: create_mono_behaviour_script
+    question: "Create a simple C# MonoBehaviour script that updates a UI Text with a timestamp every second."
+    category: code_gen
+
+  - id: fix_csharp_compile_errors
+    question: "I have a C# compile error. How do I interpret it and fix common missing-using / type-mismatch issues?"
     category: debug
 
-  - id: add_child_node
-    question: "How do I add a child node from code and add it to the scene tree?"
+  - id: inspector_binding
+    question: "How do I expose a serialized field in Unity so it appears in the Inspector and can be assigned?"
     category: explain
 
-  - id: scene_tree_ready
-    question: "Write a short script that runs when the node enters the scene tree (ready callback)."
-    category: code_gen
-
-  - id: get_node_reference
-    question: "What's the best way to get a reference to another node in the scene from my script?"
+  - id: scene_tree_modification
+    question: "How do I create a GameObject and add a component to it at editor time (tool/editor script)?"
     category: explain
 
-  - id: simple_timer
-    question: "I need a one-shot timer that calls a function after 2 seconds. How do I do that?"
-    category: code_gen
-
-  - id: resource_preload
-    question: "How do I preload a scene or script as a constant in GDScript?"
+  - id: set_component_property
+    question: "How do I programmatically set the text of a UnityEngine.UI.Text component?"
     category: explain
 
-  - id: vector2_movement
-    question: "Give me a minimal example of moving a Node2D using velocity and delta in _process."
-    category: code_gen
-
-  - id: error_null_ref
-    question: "I get 'Invalid get index on null' - what does that mean and how do I avoid it?"
-    category: debug
-
-  - id: export_var
-    question: "How do I export a variable so it shows up in the Godot inspector?"
+  - id: basic_lifecycle
+    question: "When should I use Start vs Update vs OnEnable in Unity, and what do they mean?"
     category: explain
 
-  - id: emit_signal
-    question: "How do I define and emit a custom signal from my script?"
-    category: code_gen
-
-  - id: group_nodes
-    question: "How can I get all nodes in a group (e.g. 'enemies') from code?"
-    category: explain
-
-  - id: input_single_press
-    question: "How do I detect a single key press (not held) in _input or _unhandled_input?"
-    category: code_gen
-
-  - id: animate_sprite
-    question: "What's a simple way to animate a Sprite2D's frames (AnimationPlayer vs manual)?"
-    category: explain
