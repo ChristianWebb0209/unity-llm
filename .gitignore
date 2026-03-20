@@ -1,36 +1,16 @@
-# Ignore the full Godot engine source tree
-# this repo has the whole godot engine in it also for context, this isn't necessary for running, however.
-godot/
-
-# Ignore everything in godot_plugin except addons
-# I have set up a test project in this dir, but I don't want to commit it.
-godot_plugin/*
-!godot_plugin/addons/
-!godot_plugin/addons/**
-
-# Lint capture test temp files
-godot_plugin/addons/godot_ai_assistant/tools/lint/_test_temp/
-
-# Python virtual env
-rag_service/.venv/
-
 # Usual OS/editor junk
 .vscode/
 .idea/
 *.log
-.DS_Store
-Thumbs.db
 
 *.env
-godot_knowledge_base/
-rag_service/data/chroma_db/
 .venv/
 
 # ignore all pycache files also
 __pycache__/
 
 # Large or generated assets
-*.safetensors
+*.safetensorss
 *.bin
 *.pt
 *.pth
@@ -53,3 +33,29 @@ colab/**/*.ipynb_checkpoints/
 .agents/
 .agent/
 .cursor/
+
+merge-forks.sh
+
+# Unity plugin: keep only the UnityLLM package assets + required precompiled DLLs
+unity_plugin/*
+!unity_plugin/Assets/
+!unity_plugin/Assets/UnityLLM/
+!unity_plugin/Assets/UnityLLM/**
+!unity_plugin/Assets/Plugins/
+!unity_plugin/Assets/Plugins/SystemTextJson/
+!unity_plugin/Assets/Plugins/SystemTextJson/**
+
+# Now ignore everything else under Assets except UnityLLM and SystemTextJson DLLs
+unity_plugin/Assets/*
+!unity_plugin/Assets/UnityLLM/
+!unity_plugin/Assets/UnityLLM/**
+!unity_plugin/Assets/Plugins/
+!unity_plugin/Assets/Plugins/SystemTextJson/
+!unity_plugin/Assets/Plugins/SystemTextJson/**
+
+# Under Plugins/, ignore everything except SystemTextJson DLLs
+unity_plugin/Assets/Plugins/*
+!unity_plugin/Assets/Plugins/SystemTextJson/
+!unity_plugin/Assets/Plugins/SystemTextJson/**
+
+**/*.meta
