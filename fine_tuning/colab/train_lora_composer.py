@@ -123,10 +123,12 @@ def _maybe_setup_colab_repo_and_drive() -> None:
         from google.colab import drive  # type: ignore
 
         drive.mount("/content/drive", force_remount=False)
-        base_dir = Path("/content/drive/MyDrive/unity-composer-v3-runs")
+        drive_root = Path("/content/drive/MyDrive")
+        base_dir = drive_root / "unity-composer-v3-runs"
         checkpoint_dir = base_dir / "checkpoints"
         output_adapter_dir = base_dir / "adapter"
-        model_cache_dir = base_dir / "models"
+        # Your drive's `models/` folder is one directory back in the root.
+        model_cache_dir = drive_root / "models"
         base_model_local_dir = model_cache_dir / BASE_MODEL_ID.replace("/", "--")
         checkpoint_dir.mkdir(parents=True, exist_ok=True)
         output_adapter_dir.mkdir(parents=True, exist_ok=True)
@@ -203,8 +205,10 @@ def format_messages_example(example: Dict[str, Any]) -> str:
 
 def load_tokenizer_and_model() -> tuple[AutoTokenizer, AutoModelForCausalLM]:
     # Hardcoded Colab paths (avoid env lookups for directory selection).
-    base_model_local_dir = Path("/content/drive/MyDrive/unity-composer-v3-runs/models") / BASE_MODEL_ID.replace("/", "--")
-    cache_dir = str(base_model_local_dir.parent)
+    # Prefer the Drive-root `models/` folder first.
+    model_cache_dir = Path("/content/drive/MyDrive/models")
+    base_model_local_dir = model_cache_dir / BASE_MODEL_ID.replace("/", "--")
+    cache_dir = str(model_cache_dir)
 
     local_ready = base_model_local_dir.is_dir() and (base_model_local_dir / "config.json").exists()
     if not local_ready:
