@@ -30,7 +30,8 @@ namespace UnityLLM.Editor.Backend
             Action<string> onAnswerDelta,
             Action<IReadOnlyList<ToolCall>> onToolCalls,
             Action<JsonElement> onUsage,
-            CancellationToken cancellationToken)
+            CancellationToken cancellationToken,
+            string? modelOverride = null)
         {
             await StreamComposerQueryWithToolsAsync(
                 baseUrl: baseUrl,
@@ -40,7 +41,8 @@ namespace UnityLLM.Editor.Backend
                 onAnswerDelta: onAnswerDelta,
                 onToolCalls: onToolCalls,
                 onUsage: onUsage,
-                cancellationToken: cancellationToken);
+                cancellationToken: cancellationToken,
+                modelOverride: modelOverride);
         }
 
         public async Task StreamComposerQueryWithToolsAsync(
@@ -51,7 +53,8 @@ namespace UnityLLM.Editor.Backend
             Action<string> onAnswerDelta,
             Action<IReadOnlyList<ToolCall>> onToolCalls,
             Action<JsonElement> onUsage,
-            CancellationToken cancellationToken)
+            CancellationToken cancellationToken,
+            string? modelOverride = null)
         {
             if (string.IsNullOrWhiteSpace(baseUrl))
                 throw new ArgumentException("baseUrl is required");
@@ -68,6 +71,9 @@ namespace UnityLLM.Editor.Backend
                 ["composer_mode"] = composerMode
             };
 
+            if (!string.IsNullOrWhiteSpace(modelOverride))
+                payload["model"] = modelOverride;
+
             await StreamWithSentinelsAsync(endpoint, payload, onAnswerDelta, onToolCalls, onUsage, cancellationToken);
         }
 
@@ -77,9 +83,18 @@ namespace UnityLLM.Editor.Backend
             Action<string> onAnswerDelta,
             Action<IReadOnlyList<ToolCall>> onToolCalls,
             Action<JsonElement> onUsage,
-            CancellationToken cancellationToken)
+            CancellationToken cancellationToken,
+            string? modelOverride = null)
         {
-            await StreamRagQueryWithToolsAsync(baseUrl, question, contextExtra: null, onAnswerDelta, onToolCalls, onUsage, cancellationToken);
+            await StreamRagQueryWithToolsAsync(
+                baseUrl,
+                question,
+                contextExtra: null,
+                onAnswerDelta,
+                onToolCalls,
+                onUsage,
+                cancellationToken,
+                modelOverride);
         }
 
         public async Task StreamRagQueryWithToolsAsync(
@@ -89,7 +104,8 @@ namespace UnityLLM.Editor.Backend
             Action<string> onAnswerDelta,
             Action<IReadOnlyList<ToolCall>> onToolCalls,
             Action<JsonElement> onUsage,
-            CancellationToken cancellationToken)
+            CancellationToken cancellationToken,
+            string? modelOverride = null)
         {
             if (string.IsNullOrWhiteSpace(baseUrl))
                 throw new ArgumentException("baseUrl is required");
@@ -105,6 +121,9 @@ namespace UnityLLM.Editor.Backend
                 ["top_k"] = 8
             };
 
+            if (!string.IsNullOrWhiteSpace(modelOverride))
+                payload["model"] = modelOverride;
+
             await StreamWithSentinelsAsync(endpoint, payload, onAnswerDelta, onToolCalls, onUsage, cancellationToken);
         }
 
@@ -112,7 +131,8 @@ namespace UnityLLM.Editor.Backend
             string baseUrl,
             string question,
             Action<string> onAnswerDelta,
-            CancellationToken cancellationToken)
+            CancellationToken cancellationToken,
+            string? modelOverride = null)
         {
             if (string.IsNullOrWhiteSpace(baseUrl))
                 throw new ArgumentException("baseUrl is required");
@@ -127,6 +147,9 @@ namespace UnityLLM.Editor.Backend
                 ["context"] = null,
                 ["top_k"] = 8
             };
+
+            if (!string.IsNullOrWhiteSpace(modelOverride))
+                payload["model"] = modelOverride;
 
             if (onAnswerDelta == null)
                 throw new ArgumentNullException(nameof(onAnswerDelta));
@@ -162,7 +185,8 @@ namespace UnityLLM.Editor.Backend
             string question,
             string composerMode,
             Action<string> onAnswerDelta,
-            CancellationToken cancellationToken)
+            CancellationToken cancellationToken,
+            string? modelOverride = null)
         {
             if (string.IsNullOrWhiteSpace(baseUrl))
                 throw new ArgumentException("baseUrl is required");
@@ -176,6 +200,9 @@ namespace UnityLLM.Editor.Backend
                 ["top_k"] = 8,
                 ["composer_mode"] = composerMode
             };
+
+            if (!string.IsNullOrWhiteSpace(modelOverride))
+                payload["model"] = modelOverride;
 
             if (onAnswerDelta == null)
                 throw new ArgumentNullException(nameof(onAnswerDelta));

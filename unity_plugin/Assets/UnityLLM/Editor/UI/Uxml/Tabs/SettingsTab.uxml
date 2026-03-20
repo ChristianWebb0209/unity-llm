@@ -1,6 +1,6 @@
 <ui:UXML xmlns:ui="UnityEngine.UIElements">
   <ui:VisualElement class="unityllm-settings-root" style="flex-grow: 1;">
-    <ui:Label text="Settings (V1 stub)" />
+    <ui:Label text="Settings" />
     <ui:VisualElement style="height: 10px;" />
 
     <ui:Label text="Backend base URL" />
@@ -13,9 +13,20 @@
     <ui:VisualElement style="height: 8px;" />
 
     <ui:Label text="Composer mode (agent or ask, optional)" />
-    <ui:TextField name="ComposerModeField" value=""/>
+    <ui:TextField name="ComposerModeField" value="agent" />
 
     <ui:VisualElement style="height: 12px;" />
-    <ui:Button name="ApplySettingsButton" text="Apply" />
+
+    <ui:Label text="Chat text size (px)" />
+    <ui:IntegerField name="TextSizeField" value="14" />
+
+    <ui:VisualElement style="height: 12px;" />
+
+    <ui:Label text="Model definitions (JSON)" />
+    <ui:TextField name="ModelDefinitionsJsonField" multiline="true" style="min-height: 70px;"/>
+    <ui:Label name="ModelDefinitionsErrorLabel" text="" style="color: #ff6b6b; white-space: normal; display: none;"/>
+
+    <ui:VisualElement style="height: 12px;" />
+    <ui:Button name="ApplySettingsButton" text="Apply (legacy)" style="display: none;"/>
   </ui:VisualElement>
 </ui:UXML>

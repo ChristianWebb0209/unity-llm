@@ -160,6 +160,7 @@ def main() -> None:
         "--inputs",
         nargs="*",
         default=[
+            str(REPO_ROOT / "fine_tuning" / "data" / "composer_v3" / "unity_v1_agent_candidates.jsonl"),
             str(REPO_ROOT / "fine_tuning" / "data" / "composer_v2" / "agent_from_synthetic_v2_generated.jsonl"),
             str(REPO_ROOT / "fine_tuning" / "data" / "composer_v2" / "agent_from_lint_repairs.jsonl"),
             str(REPO_ROOT / "fine_tuning" / "data" / "composer_v2" / "agent_generated.jsonl"),

@@ -29,10 +29,12 @@ namespace UnityLLM.Editor.Architecture.Controller
             string originalPrompt,
             string compileDiagnosticsText,
             int followUpIndex,
+            Dictionary<string, object?>? baseContextExtra,
             Func<Task> onNoOpAsync,
             Action<string> onAnswerDelta,
             Action<IReadOnlyList<ToolCall>> onToolCalls,
-            Action<JsonElement> onUsage)
+            Action<JsonElement> onUsage,
+            string? modelOverride = null)
         {
             if (backend == null) throw new ArgumentNullException(nameof(backend));
             if (settings == null) throw new ArgumentNullException(nameof(settings));
@@ -51,12 +53,13 @@ namespace UnityLLM.Editor.Architecture.Controller
                 return;
             }
 
-            var contextExtra = new Dictionary<string, object?>
-            {
-                // Backend expects either "errors_text" or "lint_output".
-                ["lint_output"] = lintOutput,
-                ["errors_text"] = lintOutput
-            };
+            var contextExtra = baseContextExtra != null
+                ? new Dictionary<string, object?>(baseContextExtra)
+                : new Dictionary<string, object?>();
+
+            // Backend expects either "errors_text" or "lint_output".
+            contextExtra["lint_output"] = lintOutput;
+            contextExtra["errors_text"] = lintOutput;
 
             // Request another tool-call streaming turn using the same endpoint as initial.
             var composerMode = settings.ComposerMode ?? "";
@@ -75,7 +78,8 @@ namespace UnityLLM.Editor.Architecture.Controller
                     onAnswerDelta,
                     onToolCalls,
                     onUsage,
-                    CancellationToken.None);
+                    CancellationToken.None,
+                    modelOverride: modelOverride);
             }
             else if (toolsEnabled)
             {
@@ -87,7 +91,8 @@ namespace UnityLLM.Editor.Architecture.Controller
                     onAnswerDelta,
                     onToolCalls,
                     onUsage,
-                    CancellationToken.None);
+                    CancellationToken.None,
+                    modelOverride: modelOverride);
             }
             else
             {
@@ -97,7 +102,8 @@ namespace UnityLLM.Editor.Architecture.Controller
                     originalPrompt,
                     composerMode,
                     onAnswerDelta,
-                    CancellationToken.None);
+                    CancellationToken.None,
+                    modelOverride: modelOverride);
             }
         }
     }

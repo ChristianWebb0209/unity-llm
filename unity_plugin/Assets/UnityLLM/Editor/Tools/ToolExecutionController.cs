@@ -10,12 +10,23 @@ namespace UnityLLM.Editor.Tools
 {
     public sealed class ToolExecutionController
     {
+        private static readonly HashSet<string> FileMutationTools = new HashSet<string>(StringComparer.OrdinalIgnoreCase)
+        {
+            "create_file",
+            "write_file",
+            "append_to_file",
+            "apply_patch",
+            "delete_file",
+            "create_script"
+        };
+
         private readonly List<IToolExecutor> _executors = new List<IToolExecutor>();
 
         public ToolExecutionController()
         {
             // V1: file tools are fully implemented.
             _executors.Add(new FileToolsExecutors());
+            _executors.Add(new ProjectQueryExecutors());
             // V1: PRD-required Unity tools are stubbed (argument validated + timeline failure recorded).
             _executors.Add(new SceneStubExecutors());
         }
@@ -38,7 +49,11 @@ namespace UnityLLM.Editor.Tools
                 results.Add(record);
 
                 // Persist applied file edits for later “revert selected”.
-                if (record != null && record.Status == TimelineStatus.Applied && editHistoryStore != null)
+                var toolNameLc = record?.ToolName ?? "";
+                if (record != null &&
+                    record.Status == TimelineStatus.Applied &&
+                    editHistoryStore != null &&
+                    FileMutationTools.Contains(toolNameLc))
                 {
                     var editRecord = new EditRecord
                     {
@@ -54,6 +69,8 @@ namespace UnityLLM.Editor.Tools
                             "write_file" => EditActionType.WriteFile,
                             "append_to_file" => EditActionType.AppendToFile,
                             "apply_patch" => EditActionType.ApplyPatch,
+                            "delete_file" => EditActionType.DeleteFile,
+                            "create_script" => EditActionType.CreateScript,
                             _ => EditActionType.Unknown
                         }
                     };

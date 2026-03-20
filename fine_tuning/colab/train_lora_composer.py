@@ -22,23 +22,45 @@ def _ensure_runtime_dependencies() -> None:
     """
     Ensure required training dependencies exist in Colab/runtime.
     Keeps versions pinned to a known-compatible set.
+    Note: we must enforce exact versions (not just "module is importable"),
+    otherwise Colab's preinstalled packages can cause API mismatches like:
+    `Trainer.__init__() got an unexpected keyword argument 'tokenizer'`.
     """
     required = {
         "peft": "peft==0.12.0",
-        "trl": "trl==0.9.6",
         "accelerate": "accelerate==0.34.2",
         "datasets": "datasets==2.21.0",
         "transformers": "transformers==4.44.2",
-        "bitsandbytes": "bitsandbytes==0.43.3",
+        # 0.43.x depends on `triton.ops.matmul_perf_model` which newer Triton versions removed.
+        # 0.45.1 includes the fix (removes the dependency on `triton.ops`).
+        "bitsandbytes": "bitsandbytes==0.45.1",
         "sympy": "sympy==1.13.1",
     }
-    missing: List[str] = []
+    missing_or_mismatched: List[str] = []
     for mod, pkg in required.items():
+        # Avoid importing packages here: importing can cache incompatible versions
+        # in `sys.modules` and keep using them even after `pip install`.
+        desired_version = pkg.split("==", 1)[1] if "==" in pkg else None
+        if desired_version is None:
+            missing_or_mismatched.append(pkg)
+            continue
+
         try:
-            __import__(mod)
-        except Exception:
-            missing.append(pkg)
-    if not missing:
+            from importlib.metadata import PackageNotFoundError, version as installed_version  # type: ignore
+
+            current_version = installed_version(mod)
+        except PackageNotFoundError:
+            missing_or_mismatched.append(pkg)
+            continue
+        except Exception:  # pragma: no cover
+            # If metadata is unavailable, fall back to installing the pinned version.
+            missing_or_mismatched.append(pkg)
+            continue
+
+        if current_version != desired_version:
+            missing_or_mismatched.append(pkg)
+
+    if not missing_or_mismatched:
         return
     subprocess.run(
         [
@@ -47,26 +69,56 @@ def _ensure_runtime_dependencies() -> None:
             "pip",
             "install",
             "--no-cache-dir",
-            *missing,
+            "--upgrade",
+            *missing_or_mismatched,
         ],
         check=True,
     )
 
+    # If these modules were already imported in the current runtime, they will
+    # remain cached in sys.modules. Clear them so subsequent imports use the
+    # pinned versions we just installed.
+    for mod in required.keys():
+        for name in list(sys.modules.keys()):
+            if name == mod or name.startswith(mod + "."):
+                sys.modules.pop(name, None)
+
 
 _ensure_runtime_dependencies()
+
+if "CUDA_VISIBLE_DEVICES" not in os.environ:
+    # Ensure a stable single-GPU indexing for transformers/accelerate when using device_map.
+    os.environ["CUDA_VISIBLE_DEVICES"] = "0"
+
+# Force single-process semantics so Accelerate always uses GPU index 0.
+os.environ.setdefault("RANK", "0")
+os.environ.setdefault("LOCAL_RANK", "0")
+os.environ.setdefault("WORLD_SIZE", "1")
+os.environ.setdefault("MASTER_ADDR", "127.0.0.1")
+os.environ.setdefault("MASTER_PORT", "29500")
 
 def _run(cmd: list[str], cwd: Path | None = None) -> None:
     subprocess.run(cmd, cwd=str(cwd) if cwd is not None else None, check=True)
 
 import torch
 
+if torch.cuda.is_available() and torch.cuda.device_count() > 0:
+    # Accelerate's device checks assume training happens on GPU index 0.
+    torch.cuda.set_device(0)
+
 torch.backends.cuda.matmul.allow_tf32 = True
 torch.backends.cudnn.allow_tf32 = True
 
 from datasets import Dataset, DatasetDict
-from transformers import AutoModelForCausalLM, AutoTokenizer, BitsAndBytesConfig, TrainingArguments
+from transformers import (
+    AutoModelForCausalLM,
+    AutoTokenizer,
+    BitsAndBytesConfig,
+    DataCollatorForLanguageModeling,
+    Trainer,
+    TrainingArguments,
+)
 from peft import LoraConfig, get_peft_model, prepare_model_for_kbit_training
-from trl import SFTTrainer
 from huggingface_hub import snapshot_download
 
 
@@ -225,6 +277,14 @@ def load_tokenizer_and_model() -> tuple[AutoTokenizer, AutoModelForCausalLM]:
     model_source = str(base_model_local_dir) if local_ready else BASE_MODEL_ID
     print(f"Using model source: {model_source}")
 
+    cuda_available = torch.cuda.is_available() and torch.cuda.device_count() > 0
+    print(f"CUDA available: {cuda_available} (device_count={torch.cuda.device_count()})")
+    if not cuda_available:
+        raise SystemExit(
+            "No CUDA GPU detected in this Colab runtime. QLoRA (4-bit bitsandbytes) requires a GPU. "
+            "Switch Colab Runtime to 'GPU' and restart, then re-run this script."
+        )
+
     tokenizer = AutoTokenizer.from_pretrained(
         model_source,
         trust_remote_code=True,
@@ -234,19 +294,13 @@ def load_tokenizer_and_model() -> tuple[AutoTokenizer, AutoModelForCausalLM]:
     if tokenizer.pad_token is None:
         tokenizer.pad_token = tokenizer.eos_token
 
-    attn_impl = "flash_attention_2" if torch.cuda.is_available() and torch.cuda.get_device_capability()[0] >= 8 else "sdpa"
-
-    # QLoRA 4-bit config for Colab
-    bnb_config = BitsAndBytesConfig(
-        load_in_4bit=True,
-        bnb_4bit_compute_dtype=torch.float16,
-        bnb_4bit_use_double_quant=True,
-        bnb_4bit_quant_type="nf4",
-    )
+    # `flash_attention_2` is Triton-backed and can fail with driver issues.
+    # Use `sdpa` to avoid Triton initialization issues across Colab runtimes.
+    attn_impl = "sdpa"
 
     lora_config = LoraConfig(
-        r=8,
-        lora_alpha=16,
+        r=4,
+        lora_alpha=8,
         lora_dropout=0.05,
         bias="none",
         task_type="CAUSAL_LM",
@@ -259,13 +313,33 @@ def load_tokenizer_and_model() -> tuple[AutoTokenizer, AutoModelForCausalLM]:
         have_accelerate = False
 
     try:
-        model_kwargs: Dict[str, Any] = dict(
-            quantization_config=bnb_config,
-            trust_remote_code=True,
-            attn_implementation=attn_impl,
-        )
-        if have_accelerate:
-            model_kwargs["device_map"] = "auto"
+        if cuda_available:
+            # QLoRA 4-bit config for Colab (requires CUDA).
+            bnb_config = BitsAndBytesConfig(
+                load_in_4bit=True,
+                bnb_4bit_compute_dtype=torch.float16,
+                bnb_4bit_use_double_quant=True,
+                bnb_4bit_quant_type="nf4",
+            )
+            model_kwargs: Dict[str, Any] = dict(
+                quantization_config=bnb_config,
+                trust_remote_code=True,
+                attn_implementation=attn_impl,
+                low_cpu_mem_usage=True,
+            )
+            if have_accelerate:
+                # Explicitly place the quantized model on the active CUDA device
+                # (Accelerate's guard expects the quantized model and the training
+                # device to line up).
+                current_device = torch.cuda.current_device()
+                device_str = f"cuda:{current_device}"
+                model_kwargs["device_map"] = {"": current_device}
+                # Avoid CPU/disk offload for quantized weights (RAM spikes).
+                model_kwargs["max_memory"] = {
+                    device_str: "13GiB",
+                    "cpu": "0GiB",
+                }
+
         model = AutoModelForCausalLM.from_pretrained(
             model_source,
             **model_kwargs,
@@ -273,13 +347,15 @@ def load_tokenizer_and_model() -> tuple[AutoTokenizer, AutoModelForCausalLM]:
             local_files_only=local_ready,
         )
     except (RuntimeError, ModuleNotFoundError, OSError, ValueError, ImportError):
-        # Fallback: load bf16 without 4-bit if bitsandbytes/4bit fails.
+        if not cuda_available:
+            raise
+        # GPU fallback: load bf16 without 4-bit if bitsandbytes/4bit fails.
         fallback_kwargs: Dict[str, Any] = dict(
             torch_dtype=torch.bfloat16 if torch.cuda.is_available() else torch.float32,
             trust_remote_code=True,
             attn_implementation=attn_impl,
         )
-        if have_accelerate:
+        if have_accelerate and cuda_available:
             fallback_kwargs["device_map"] = "auto"
         model = AutoModelForCausalLM.from_pretrained(
             model_source,
@@ -288,25 +364,38 @@ def load_tokenizer_and_model() -> tuple[AutoTokenizer, AutoModelForCausalLM]:
             local_files_only=local_ready,
         )
 
-    model = prepare_model_for_kbit_training(model)
+    if cuda_available:
+        # PEFT's prepare step can spike memory (casts some params to fp32).
+        # For this environment, skip by default to prevent OOM/RAM crashes.
+        # Set PREPARE_KBIT_TRAINING=1 to opt back in.
+        if os.environ.get("PREPARE_KBIT_TRAINING", "0").strip() in {"1", "true", "yes", "y"}:
+            torch.cuda.empty_cache()
+            model = prepare_model_for_kbit_training(model)
     model = get_peft_model(model, lora_config)
 
     # Required for gradient checkpointing + LoRA
     model.config.use_cache = False
-    model.gradient_checkpointing_enable()
+    # Avoid DDP issues with re-entrant checkpointing (PyTorch>=2.5 warns/behaves differently).
+    # HF supports passing `gradient_checkpointing_kwargs`.
+    try:
+        model.gradient_checkpointing_enable(gradient_checkpointing_kwargs={"use_reentrant": False})
+    except TypeError:
+        # Fallback for older HF versions.
+        model.gradient_checkpointing_enable()
     model.enable_input_require_grads()
 
     return tokenizer, model
 
 
-def build_trainer(tokenizer: AutoTokenizer, model: AutoModelForCausalLM, dataset: DatasetDict) -> SFTTrainer:
+def build_trainer(tokenizer: AutoTokenizer, model: AutoModelForCausalLM, dataset: DatasetDict) -> Trainer:
     output_dir = "./unity-composer-v1-lora"
 
+    using_cuda = torch.cuda.is_available() and torch.cuda.device_count() > 0
     training_args = TrainingArguments(
         output_dir=output_dir,
-        per_device_train_batch_size=2,
+        per_device_train_batch_size=1,
         per_device_eval_batch_size=1,
-        gradient_accumulation_steps=2,
+        gradient_accumulation_steps=4,
         num_train_epochs=1,
         learning_rate=2e-4,
         lr_scheduler_type="cosine",
@@ -317,22 +406,46 @@ def build_trainer(tokenizer: AutoTokenizer, model: AutoModelForCausalLM, dataset
         save_steps=700,
         save_total_limit=3,
         bf16=False,
-        fp16=True,
-        gradient_checkpointing=True,
+        fp16=using_cuda,
+        gradient_checkpointing=False,
+        # Lower VRAM usage for optimizer states with QLoRA.
+        optim="paged_adamw_8bit",
         report_to="none",
     )
 
-    trainer = SFTTrainer(
-        model=model,
-        tokenizer=tokenizer,
-        train_dataset=dataset["train"],
-        eval_dataset=dataset["val"],
-        dataset_text_field="text",
-        # Colab GPU memory is tight; keep sequence length conservative.
-        max_seq_length=512,
-        args=training_args,
+    # Tokenize ahead of time so we don't rely on TRL's SFTTrainer wrapper.
+    # Lower sequence length to reduce activation memory.
+    max_seq_length = 256
+
+    def _tokenize_batch(batch: Dict[str, Any]) -> Dict[str, Any]:
+        return tokenizer(
+            batch["text"],
+            truncation=True,
+            max_length=max_seq_length,
+            padding=False,
+            return_attention_mask=True,
+        )
+
+    tokenized_train = dataset["train"].map(
+        _tokenize_batch,
+        batched=True,
+        remove_columns=dataset["train"].column_names,
     )
-    return trainer
+    tokenized_val = dataset["val"].map(
+        _tokenize_batch,
+        batched=True,
+        remove_columns=dataset["val"].column_names,
+    )
+
+    data_collator = DataCollatorForLanguageModeling(tokenizer=tokenizer, mlm=False)
+
+    return Trainer(
+        model=model,
+        args=training_args,
+        train_dataset=tokenized_train,
+        eval_dataset=tokenized_val,
+        data_collator=data_collator,
+    )
 
 
 def main() -> None:
@@ -357,6 +470,9 @@ def main() -> None:
 
     dataset = DatasetDict({"train": train_ds, "val": val_ds})
     tokenizer, model = load_tokenizer_and_model()
+    if torch.cuda.is_available() and torch.cuda.device_count() > 0:
+        # Make sure the active CUDA device matches what the quantized model expects.
+        torch.cuda.set_device(torch.cuda.current_device())
     trainer = build_trainer(tokenizer, model, dataset)
 
     trainer.train()

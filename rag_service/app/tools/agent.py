@@ -201,11 +201,6 @@ def find_references_to(ctx: RunContext[UnityQueryDeps], res_path: str) -> Any:
     return _run_tool(ctx, "find_references_to", res_path=res_path)
 
 
-def get_recent_changes(ctx: RunContext[UnityQueryDeps], limit: int = 20) -> Any:
-    """Return the last N edit events (what files were recently created/modified by the AI)."""
-    return _run_tool(ctx, "get_recent_changes", limit=limit)
-
-
 def grep_search(
     ctx: RunContext[UnityQueryDeps],
     pattern: str = "",
@@ -364,7 +359,6 @@ UNITY_AGENT_TOOLS = [
     project_structure,
     find_scripts_by_extends,
     find_references_to,
-    get_recent_changes,
     grep_search,
     fetch_url,
     run_terminal_command,

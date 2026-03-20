@@ -18,6 +18,7 @@ namespace UnityLLM.Editor.Tools.Executors
     public sealed class SceneStubExecutors : IToolExecutor
     {
         private static readonly List<string> _recentCompilerMessages = new List<string>();
+        private static readonly object CompilerMessagesLock = new object();
 
         static SceneStubExecutors()
         {
@@ -27,14 +28,17 @@ namespace UnityLLM.Editor.Tools.Executors
         private static void OnAssemblyCompilationFinished(string assemblyPath, CompilerMessage[] messages)
         {
             if (messages == null || messages.Length == 0) return;
-            foreach (var m in messages)
+            lock (CompilerMessagesLock)
             {
-                var kind = m.type.ToString();
-                _recentCompilerMessages.Add($"{kind}: {m.file}:{m.line}:{m.column}: {m.message}");
-            }
-            if (_recentCompilerMessages.Count > 5000)
-            {
-                _recentCompilerMessages.RemoveRange(0, _recentCompilerMessages.Count - 5000);
+                foreach (var m in messages)
+                {
+                    var kind = m.type.ToString();
+                    _recentCompilerMessages.Add($"{kind}: {m.file}:{m.line}:{m.column}: {m.message}");
+                }
+                if (_recentCompilerMessages.Count > 5000)
+                {
+                    _recentCompilerMessages.RemoveRange(0, _recentCompilerMessages.Count - 5000);
+                }
             }
         }
 
@@ -55,6 +59,7 @@ namespace UnityLLM.Editor.Tools.Executors
                 "set_component_property" => true,
                 "connect_ui_event" => true,
                 "collect_compile_errors" => true,
+                "lint_file" => true,
                 "run_unity_editor_tests" => true,
                 _ => false
             };
@@ -82,6 +87,7 @@ namespace UnityLLM.Editor.Tools.Executors
                     "set_component_property" => ExecuteSetComponentProperty(toolCall),
                     "connect_ui_event" => ExecuteConnectUiEvent(toolCall),
                     "collect_compile_errors" => ExecuteCollectCompileErrors(toolCall),
+                    "lint_file" => ExecuteLintFile(toolCall),
                     "run_unity_editor_tests" => ExecuteRunUnityEditorTests(toolCall),
                     _ => throw new InvalidOperationException($"Unsupported scene tool: {toolCall.ToolName}")
                 };
@@ -128,6 +134,9 @@ namespace UnityLLM.Editor.Tools.Executors
                     break;
                 case "delete_game_object":
                     RequireString(args, "game_object_path");
+                    break;
+                case "lint_file":
+                    RequireString(args, "path");
                     break;
                 case "collect_compile_errors":
                 case "run_unity_editor_tests":
@@ -517,7 +526,13 @@ namespace UnityLLM.Editor.Tools.Executors
         {
             bool includeWarnings = GetBool(toolCall.Arguments, "include_warnings", true);
             int maxItems = Math.Max(1, GetInt(toolCall.Arguments, "max_items", 200));
-            var filtered = _recentCompilerMessages
+            List<string> snapshot;
+            lock (CompilerMessagesLock)
+            {
+                snapshot = _recentCompilerMessages.ToList();
+            }
+
+            var filtered = snapshot
                 .Where(m => includeWarnings || !m.StartsWith("Warning", StringComparison.OrdinalIgnoreCase))
                 .ToList();
             if (filtered.Count > maxItems)
@@ -528,6 +543,81 @@ namespace UnityLLM.Editor.Tools.Executors
             if (string.IsNullOrWhiteSpace(payload))
                 payload = "No recent compiler diagnostics captured.";
             return BuildSuccess(toolCall, "Collected compile diagnostics", newContent: payload);
+        }
+
+        private PendingTimelineRecord ExecuteLintFile(ToolCall toolCall)
+        {
+            bool includeWarnings = GetBool(toolCall.Arguments, "include_warnings", true);
+            int maxItems = Math.Max(1, GetInt(toolCall.Arguments, "max_items", 200));
+            int timeoutSeconds = Math.Max(5, GetInt(toolCall.Arguments, "lint_timeout_seconds", 120));
+
+            var lintInput = GetString(toolCall.Arguments, "path");
+            if (string.IsNullOrWhiteSpace(lintInput))
+                throw new InvalidOperationException("lint_file requires argument 'path'.");
+
+            // Normalize to Assets/... inside the project.
+            var assetPath = lintInput.Replace('\\', '/').Trim();
+            if (assetPath.StartsWith("res://", StringComparison.OrdinalIgnoreCase))
+                assetPath = assetPath.Substring("res://".Length);
+            assetPath = assetPath.TrimStart('/');
+
+            if (!assetPath.StartsWith("Assets/", StringComparison.OrdinalIgnoreCase))
+            {
+                var idx = assetPath.IndexOf("/Assets/", StringComparison.OrdinalIgnoreCase);
+                if (idx >= 0)
+                    assetPath = assetPath.Substring(idx + 1); // keep leading Assets/
+            }
+
+            if (!assetPath.StartsWith("Assets/", StringComparison.OrdinalIgnoreCase))
+                throw new InvalidOperationException($"lint_file path must resolve to Assets/... . Received: '{lintInput}'");
+
+            var assetPathNorm = assetPath;
+            var fileNameOnly = assetPathNorm.Split('/').LastOrDefault() ?? assetPathNorm;
+            var absPath = ResPathUtility.ToAbsolutePath(assetPathNorm).Replace('\\', '/');
+
+            int startCount;
+            lock (CompilerMessagesLock)
+                startCount = _recentCompilerMessages.Count;
+
+            // Force re-import so Unity triggers compilation for this file.
+            AssetDatabase.ImportAsset(assetPathNorm, ImportAssetOptions.ForceUpdate);
+            AssetDatabase.Refresh();
+
+            // Wait until compilation settles.
+            var sw = System.Diagnostics.Stopwatch.StartNew();
+            var sawCompiling = false;
+            while (sw.Elapsed.TotalSeconds < timeoutSeconds)
+            {
+                if (EditorApplication.isCompiling)
+                    sawCompiling = true;
+
+                if (sawCompiling && !EditorApplication.isCompiling)
+                    break;
+
+                System.Threading.Thread.Sleep(200);
+            }
+
+            List<string> newMessages;
+            lock (CompilerMessagesLock)
+                newMessages = _recentCompilerMessages.Skip(startCount).ToList();
+
+            var filtered = newMessages
+                .Where(m =>
+                    (includeWarnings || !m.StartsWith("Warning", StringComparison.OrdinalIgnoreCase)) &&
+                    // Mention-based filtering for stability across Unity versions.
+                    (m.IndexOf(assetPathNorm, StringComparison.OrdinalIgnoreCase) >= 0 ||
+                     m.IndexOf(absPath, StringComparison.OrdinalIgnoreCase) >= 0 ||
+                     m.IndexOf(fileNameOnly, StringComparison.OrdinalIgnoreCase) >= 0))
+                .ToList();
+
+            if (filtered.Count > maxItems)
+                filtered = filtered.Skip(filtered.Count - maxItems).ToList();
+
+            var payload = string.Join("\n", filtered);
+            if (string.IsNullOrWhiteSpace(payload))
+                payload = $"No compiler diagnostics captured for {assetPathNorm}.";
+
+            return BuildSuccess(toolCall, $"Linted {assetPathNorm}", newContent: payload);
         }
 
         private PendingTimelineRecord ExecuteRunUnityEditorTests(ToolCall toolCall)

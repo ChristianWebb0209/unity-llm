@@ -15,9 +15,8 @@ This file is the **single source of truth** for how the **Unity LLM Assistant** 
 - **Change plugin UI (tabs, chat, diff, history)**  
   `unity_plugin/addons/unity_ai_assistant/ai_dock.gd` (logic) and `ai_dock.tscn` (scene). Tab selection uses **child node name** (e.g. `History`, `Settings`), not tab index.
 
-- **Edit History data**  
+- **Edit History data**
   Plugin-only: Edit History tab uses `UnityAIEditStore` and persists to `user://unity_ai_assistant/edit_history/edits.json`.
-  Backend edit-history endpoints are deprecated (see `/edit_events/*` routes).
 
 - **Plugin not loading**  
   If the dock does not appear: check Unity Output for parse/script errors. Common causes: wrong node path in @onready (use `get_node_or_null()` in `_ready()` for optional nodes), or GDScript/Unity 4 API misuse (see §11). Open the project from the folder that contains `project.unity` (e.g. `unity_plugin`), not the parent repo root.
@@ -169,7 +168,7 @@ That retrieval is **disabled** in the current `/query` “tools loop” path; th
   - **find_references_to**: `get_inbound_refs()` – files that reference a given Assets/ path (from repo index edges).
 - **No RAG fetch in query path**: The assistant no longer retrieves from `docs` or `project_code` Chroma collections or exposes search_docs / search_project_code / request_component_context tools (simplified for fine-tuned model).
 - **Editor-action tools** (return `execute_on_client: true`; plugin runs after stream): create_file, write_file, append_to_file, apply_patch, create_script, create_node, delete_file, modify_attribute, lint_file; **run_terminal_command**, **run_unity_headless**, **run_scene** (run.gd); **grep_search** (fs.gd); **get_node_tree** (scene_tree.gd); **get_signals**, **connect_signal** (signals.gd); **get_export_vars** (inspector.gd); **get_project_settings**, **get_autoloads**, **get_input_map** (project.gd); **check_errors** (editor_errors.gd).
-- **Server-only (no project required)**: **fetch_url** (HTTP GET), **search_asset_library** (Unity Asset Library API). The backend edit-history tool `get_recent_changes` is deprecated and returns empty results.
+- **Server-only (no project required)**: **fetch_url** (HTTP GET), **search_asset_library** (Unity Asset Library API).
 - **Fast tool-call semantics** (minimize tokens): create_file(path) may have empty content (create then write_file); prefer apply_patch over write_file for edits; create_script supports optional `template` (e.g. character_2d, character_3d) for boilerplate; append_to_file for incremental writes. When `project_root_abs` is set, create_file, write_file, apply_patch, and append_to_file run on the server and return `content` in the tool result so the model does not need read_file to verify.
 - **apply_patch**: accepts either (path, old_string, new_string) or (path, diff) with a unified-diff string.
 - **modify_attribute**: `target_type='node'` (scene_path, node_path, attribute, value) or `target_type='import'` (path, attribute, value) for .import [params].
@@ -272,7 +271,6 @@ Vector indexing / ChromaDB collections were removed from this repo, so there is 
 ### 7.2 Edit history: plugin-only local store
 
 - **Plugin local store** (`user://unity_ai_assistant/edit_history/edits.json`): Timeline of applied file/node changes for the **Pending & Timeline** tab, file/node status for 🟢🟡🔴 indicators, and **Revert** (writes `old_content` back to the file).
-- Backend `/edit_events/*` routes are deprecated and no longer used by the plugin.
 
 ### 6.3 Dock layout
 
@@ -333,7 +331,7 @@ Vector indexing / ChromaDB collections were removed from this repo, so there is 
 - **Purpose**: Store lint failure → successful fix (diff + optional explanation) so the same or similar errors get “past fix” context and the LLM produces more consistent Unity 4.x GDScript.
 - **Storage**: Client-owned JSON persisted to `user://unity_ai_assistant/lint_memory/lint_memory.json` (`UnityAILintMemoryStore`). Not training the model—improving the **retrieval** layer.
 - **Normalization**: Raw lint output is normalized (strip paths, line/column, quoted identifiers) and hashed with `engine_version` to form an error key so repeated identical errors collapse.
-- **Endpoints**: `POST /lint_memory/record_fix` and `GET /lint_memory/search` are deprecated; the plugin no longer uses them.
+- **Endpoints**: lint repair memory is client-owned; the backend does not provide a storage/search API for it.
 - **Plugin**: When auto-lint fix succeeds, the dock records the fix locally, and injects `context.extra.lint_repair_memory` into requests so the backend can include past fixes without querying SQLite.
 
 ---

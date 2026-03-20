@@ -606,6 +606,32 @@
     }
   },
   {
+    "name": "lint_file",
+    "description": "Lint a C# script by forcing Unity to recompile it, then return compiler error/warning diagnostics that reference the specified file.",
+    "parameters": {
+      "type": "object",
+      "properties": {
+        "path": {
+          "type": "string",
+          "description": "Project-relative path under Assets/ to the script file, e.g. Assets/Scripts/PlayerController.cs"
+        },
+        "include_warnings": {
+          "type": "boolean",
+          "default": true
+        },
+        "max_items": {
+          "type": "integer",
+          "default": 200,
+          "minimum": 1,
+          "maximum": 5000
+        }
+      },
+      "required": [
+        "path"
+      ]
+    }
+  },
+  {
     "name": "run_unity_editor_tests",
     "description": "Run Unity EditMode tests via Unity Test Runner API (TestRunnerApi).",
     "parameters": {

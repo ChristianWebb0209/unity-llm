@@ -78,6 +78,7 @@ def main() -> None:
         "--inputs",
         nargs="*",
         default=[
+            str(REPO_ROOT / "fine_tuning" / "data" / "composer_v3" / "unity_v1_ask_candidates.jsonl"),
             str(REPO_ROOT / "fine_tuning" / "data" / "composer_v2" / "ask_generated.jsonl"),
             str(REPO_ROOT / "fine_tuning" / "data" / "composer_v2" / "train.jsonl"),
             str(REPO_ROOT / "fine_tuning" / "data" / "composer_v3" / "ask_adversarial_contract.jsonl"),

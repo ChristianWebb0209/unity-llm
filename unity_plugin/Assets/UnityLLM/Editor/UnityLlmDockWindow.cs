@@ -80,9 +80,7 @@ namespace UnityLLM.Editor
             _controller.Initialize(
                 chatView: _chatView,
                 timelineView: _timelineView,
-                settingsView: _settingsView,
-                onSend: prompt => _controller.HandleSendPrompt(prompt, _chatView, _timelineView, _settingsView),
-                onRequestSettingsApply: settings => _settingsView.ApplySettings(settings)
+                settingsView: _settingsView
             );
 
             var chatBtn = rootVisualElement.Q<Button>("ChatTabButton");

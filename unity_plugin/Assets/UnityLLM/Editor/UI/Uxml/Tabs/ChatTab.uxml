@@ -1,5 +1,17 @@
 <ui:UXML xmlns:ui="UnityEngine.UIElements">
-  <ui:VisualElement class="unityllm-chat-root" style="flex-grow: 1;">
+  <ui:VisualElement class="unityllm-chat-root" style="flex-grow: 1; flex-direction: column;">
+    <ui:VisualElement class="unityllm-chat-topbar" style="flex-direction: row; gap: 6px; margin-bottom: 6px;">
+      <ui:ScrollView name="ChatTabsScrollView" horizontal="true" style="flex-grow: 1;">
+        <!-- Populated at runtime -->
+      </ui:ScrollView>
+      <ui:Button name="NewChatButton" text="New chat" />
+    </ui:VisualElement>
+
+    <ui:VisualElement class="unityllm-chat-model-row" style="flex-direction: row; gap: 6px; margin-bottom: 6px;">
+      <ui:Label text="Model:" style="min-width: 56px;" />
+      <ui:DropdownField name="ModelDropdown" />
+    </ui:VisualElement>
+
     <ui:ScrollView name="ChatMessages" class="unityllm-messages" />
 
     <ui:Label name="ChatErrorLabel" text="" style="color: #ff6b6b; white-space: normal; display: none;" />

@@ -291,20 +291,7 @@ def _tool_find_references_to(args: Dict[str, Any]) -> Dict[str, Any]:
     }
 
 
-# --- New tools: get_recent_changes, grep_search, fetch_url, run, scene, node tree, signals, etc. ---
-
-def _tool_get_recent_changes(args: Dict[str, Any]) -> Dict[str, Any]:
-    """
-    Deprecated: backend edit history was moved to the Unity plugin.
-
-    The plugin now persists edit timeline + revert locally under `user://` via UnityAIEditStore.
-    """
-    return {
-        "success": False,
-        "message": "deprecated: edit history is local-only in the Unity plugin.",
-        "events": [],
-    }
-
+# --- New tools: grep_search, fetch_url, run, scene, node tree, signals, etc. ---
 
 def _tool_grep_search(args: Dict[str, Any]) -> Dict[str, Any]:
     """Regex or exact pattern search in project files. Server runs when project open; else client."""
@@ -797,21 +784,6 @@ def get_registered_tools() -> List[ToolDef]:
                 "required": ["res_path"],
             },
             handler=_tool_find_references_to,
-        ),
-        # --- Cursor parity + Unity-specific ---
-        ToolDef(
-            name="get_recent_changes",
-            description=(
-                "Deprecated. Edit history is persisted locally in the Unity plugin (UnityAIEditStore). "
-                "This backend returns an empty result."
-            ),
-            parameters={
-                "type": "object",
-                "properties": {
-                    "limit": {"type": "integer", "description": "Max number of events to return.", "default": 20, "minimum": 1, "maximum": 50},
-                },
-            },
-            handler=_tool_get_recent_changes,
         ),
         ToolDef(
             name="grep_search",

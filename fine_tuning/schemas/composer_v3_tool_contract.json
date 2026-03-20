@@ -25,6 +25,7 @@
     "set_component_property",
     "connect_ui_event",
     "collect_compile_errors",
+    "lint_file",
     "run_unity_editor_tests"
   ]
 }

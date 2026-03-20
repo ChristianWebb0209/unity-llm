@@ -19,6 +19,29 @@ namespace UnityLLM.Editor.Architecture.Model
             });
         }
 
+        /// <summary>
+        /// Adds an assistant message placeholder and returns its index so the caller can update content while streaming.
+        /// </summary>
+        public int BeginAssistantMessage()
+        {
+            var idx = Messages.Count;
+            Messages.Add(new ChatMessage
+            {
+                Role = ChatRole.Assistant,
+                Content = "",
+                TimestampUtc = DateTime.UtcNow
+            });
+            return idx;
+        }
+
+        public void UpdateAssistantMessageContent(int messageIndex, string content)
+        {
+            if (messageIndex < 0 || messageIndex >= Messages.Count) return;
+            if (Messages[messageIndex] == null) return;
+            if (Messages[messageIndex].Role != ChatRole.Assistant) return;
+            Messages[messageIndex].Content = content ?? "";
+        }
+
         public void AddAssistantMessage(string content)
         {
             Messages.Add(new ChatMessage

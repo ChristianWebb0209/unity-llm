@@ -617,8 +617,35 @@ def _run_query_with_tools(
         except Exception:
             pass
 
-    # Recent edits working set is omitted in stateless mode.
+    # Recent edits working set (agent-time context).
+    # Unity plugin can send `context.extra.recent_edits` as a list of strings.
     recent_edits_text: List[str] = []
+    try:
+        recent_raw = (extra or {}).get("recent_edits") if isinstance(extra, dict) else None
+        if isinstance(recent_raw, list) and recent_raw:
+            max_items = 12
+            for item in recent_raw[:max_items]:
+                if isinstance(item, str):
+                    s = item.strip()
+                    if s:
+                        recent_edits_text.append(s)
+                elif isinstance(item, dict):
+                    # Best-effort formatting for future-proofing; Unity currently sends strings.
+                    path = (item.get("path") or item.get("file_path") or item.get("file") or "").strip()
+                    tool = (item.get("tool") or item.get("tool_name") or item.get("action") or "").strip()
+                    old_txt = item.get("old") or item.get("old_content") or item.get("before") or ""
+                    new_txt = item.get("new") or item.get("new_content") or item.get("after") or ""
+                    entry = (
+                        f"--- Recent edit ({tool or 'edit'}) ---\n"
+                        f"Path: {path or '(unknown)'}\n"
+                        f"Old:\n{str(old_txt)[:2000]}\n"
+                        f"New:\n{str(new_txt)[:2000]}"
+                    ).strip()
+                    if entry:
+                        recent_edits_text.append(entry)
+    except Exception:
+        # Best-effort only; context window will still work without recent_edits.
+        recent_edits_text = []
 
     # Build dedicated ENVIRONMENT block (high priority, never dropped).
     environment_parts: List[str] = []
@@ -944,6 +971,18 @@ def _run_composer_query(
         user_parts.append("Current file content:\n" + str(extra["active_file_text"]))
     if extra.get("scene_tree"):
         user_parts.append("Scene tree:\n" + str(extra["scene_tree"]))
+    recent = extra.get("recent_edits")
+    if recent and isinstance(recent, list) and len(recent) > 0:
+        parts: List[str] = []
+        for e in recent[:8]:
+            if isinstance(e, str) and e.strip():
+                parts.append(e.strip())
+            elif e is not None:
+                s = str(e).strip()
+                if s:
+                    parts.append(s)
+        if parts:
+            user_parts.append("Recent edits:\n" + "\n\n".join(parts))
     if extra.get("lint_output"):
         user_parts.append("Lint output:\n" + str(extra["lint_output"]))
     if extra.get("active_scene_path"):
@@ -1065,49 +1104,16 @@ async def index_status(project_root: Optional[str] = None) -> Dict[str, Any]:
     return out
 
 
-class FileChangeIn(TypedDict, total=False):
-    file_path: str
-    change_type: str  # default "modify"
-    old_content: str
-    new_content: str
-
-
-class EditEventIn(TypedDict, total=False):
-    actor: str  # default "ai"
-    trigger: str  # default "tool_action"
-    summary: str
-    prompt: Optional[str]
-    changes: List[FileChangeIn]
-    semantic_summary: Optional[str]
-    lint_errors_before: Optional[str]
-    lint_errors_after: Optional[str]
-    retrieved_chunk_ids: Optional[List[str]]
-
-
-class UndoResponse(TypedDict, total=False):
-    tool_calls: List[ToolCallResult]
-
-
-class LintFixIn(TypedDict, total=False):
-    project_root_abs: str
-    file_path: str  # Assets/...
-    engine_version: str
-    raw_lint_output: str
-    old_content: str
-    new_content: str
-    prompt: Optional[str]
-
-
-@app.post("/lint_memory/record_fix")
-async def lint_memory_record_fix(payload: LintFixIn) -> Dict[str, Any]:
-    # Deprecated: lint repair memory is stored locally in the Unity plugin (user://).
-    return {"ok": False, "error": "deprecated: lint_memory is client-owned"}
-
-
-@app.get("/lint_memory/search")
-async def lint_memory_search(engine_version: str, raw_lint_output: str, limit: int = 3) -> Dict[str, Any]:
-    # Deprecated: lint repair memory is stored locally in the Unity plugin (user://).
-    return {"ok": False, "results": []}
+#
+# Deprecated endpoints removed:
+# - POST /lint_memory/record_fix
+# - GET /lint_memory/search
+# - POST /edit_events/create
+# - GET /edit_events/list
+# - GET /edit_events/{edit_id}
+# - POST /edit_events/undo/{edit_id}
+# - GET /usage
+#
 
 
 class LintRequest(TypedDict, total=False):
@@ -1203,47 +1209,6 @@ async def run_lint(payload: Dict[str, Any]) -> Dict[str, Any]:
         }
     except Exception as e:
         return {"success": False, "output": str(e), "exit_code": -1}
-
-
-@app.post("/edit_events/create")
-async def edit_events_create(payload: EditEventIn) -> Dict[str, Any]:
-    # Deprecated: edit history is stored locally in the Unity plugin (user://).
-    return {"ok": False, "error": "deprecated: edit_events are client-owned"}
-
-
-@app.get("/edit_events/list")
-async def edit_events_list(limit: int = 500) -> Dict[str, Any]:
-    # Deprecated: edit history is stored locally in the Unity plugin (user://).
-    return {"ok": False, "events": []}
-
-
-@app.get("/usage")
-async def usage() -> Dict[str, Any]:
-    """
-    Return aggregated token usage and estimated cost (from usage_log).
-    Used by the Edit History tab to show tokens and cost at the bottom.
-    """
-    # Deprecated: token usage is tracked locally in the Unity plugin (user://).
-    return {
-        "ok": False,
-        "total_prompt_tokens": 0,
-        "total_completion_tokens": 0,
-        "total_tokens": 0,
-        "estimated_cost_usd": 0.0,
-        "by_model": {},
-    }
-
-
-@app.get("/edit_events/{edit_id}")
-async def edit_events_get(edit_id: int) -> Dict[str, Any]:
-    # Deprecated: edit history is stored locally in the Unity plugin (user://).
-    return {"ok": False, "error": "deprecated: edit_events are client-owned"}
-
-
-@app.post("/edit_events/undo/{edit_id}")
-async def edit_events_undo(edit_id: int) -> Dict[str, Any]:
-    # Deprecated: undo is handled locally in the Unity plugin.
-    return {"tool_calls": []}
 
 
 @app.post("/query")
