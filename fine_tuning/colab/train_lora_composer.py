@@ -152,21 +152,35 @@ def _maybe_setup_colab_repo_and_drive() -> None:
         return
 
     repo_dir = Path("/content/unity-llm").resolve()
+    repo_url = "https://github.com/ChristianWebb0209/unity-llm"
 
     if not repo_dir.exists():
-        _run(["git", "clone", "https://github.com/ChristianWebb0209/unity-llm", str(repo_dir)])
+        _run(["git", "clone", repo_url, str(repo_dir)])
 
-    # If repo exists and has a remote, try to update; otherwise continue.
+    # Always attempt to pull the latest code from GitHub before training.
+    # This is a best-effort sync: if it fails, we still continue (but we log why).
     try:
-        _run(["git", "fetch", "origin"], cwd=repo_dir)
-        _run(["git", "reset", "--hard", "origin/master"], cwd=repo_dir)
-    except Exception:
-        # Repo might have no origin configured or branch might differ.
-        # Best-effort: attempt pull, then continue.
+        # Ensure `origin` exists.
         try:
-            _run(["git", "pull"], cwd=repo_dir)
+            _run(["git", "remote", "get-url", "origin"], cwd=repo_dir)
         except Exception:
-            pass
+            _run(["git", "remote", "add", "origin", repo_url], cwd=repo_dir)
+
+        _run(["git", "fetch", "origin", "--prune", "--tags"], cwd=repo_dir)
+
+        # Support both master and main.
+        branch = "master"
+        try:
+            _run(["git", "show-ref", "--verify", "--quiet", f"refs/remotes/origin/{branch}"], cwd=repo_dir)
+        except Exception:
+            branch = "main"
+            _run(["git", "show-ref", "--verify", "--quiet", f"refs/remotes/origin/{branch}"], cwd=repo_dir)
+
+        # Hard reset to ensure we truly have the latest tree.
+        _run(["git", "reset", "--hard", f"origin/{branch}"], cwd=repo_dir)
+        _run(["git", "clean", "-fdx"], cwd=repo_dir)
+    except Exception as e:
+        print(f"Repo sync skipped (continuing with existing checkout): {type(e).__name__}: {e}")
 
     os.chdir(repo_dir)
     _refresh_paths_from_cwd()
