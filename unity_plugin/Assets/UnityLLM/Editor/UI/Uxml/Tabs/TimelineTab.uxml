@@ -1,0 +1,12 @@
+<ui:UXML xmlns:ui="UnityEngine.UIElements">
+  <ui:VisualElement class="unityllm-timeline-root" style="flex-grow: 1;">
+    <ui:Label text="Pending &amp; Timeline (V1 stub)" />
+    <ui:VisualElement style="height: 10px;" />
+    <ui:ScrollView name="TimelineScrollView" style="flex-grow: 1;"/>
+    <ui:VisualElement name="DiffPreviewArea" style="margin-top: 8px; border-top-width: 1; border-top-color: rgba(255,255,255,0.15); border-top-style: solid; padding-top: 8px;">
+      <ui:Label name="DiffTitleLabel" text="Diff Preview" />
+      <ui:TextElement name="DiffOldText" text="Old: (select an edit)" style="white-space: normal;" />
+      <ui:TextElement name="DiffNewText" text="New: (select an edit)" style="white-space: normal;" />
+    </ui:VisualElement>
+  </ui:VisualElement>
+</ui:UXML>

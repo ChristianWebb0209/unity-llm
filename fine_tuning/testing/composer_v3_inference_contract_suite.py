@@ -21,7 +21,7 @@ from .config import COMPOSER_API_KEY, COMPOSER_BASE_URL, COMPOSER_MODEL, get_com
 
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
-TOOLS_JSON = REPO_ROOT / "fine_tuning" / "schemas" / "tools.json"
+TOOLS_JSON = REPO_ROOT / "tools.json"
 
 AGENT_PROMPTS = [
     "Create a CharacterBody2D script that moves left and right.",

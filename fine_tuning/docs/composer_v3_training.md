@@ -3,7 +3,7 @@
 ## Goal
 Train and ship a Composer model that is strict about tool usage:
 
-- uses only tools that exist in `fine_tuning/schemas/tools.json`
+- uses only tools that exist in `tools.json` (repo root)
 - emits contract-valid tool calls in AGENT mode
 - emits exactly one question and no tools in ASK mode
 - fails fast in data build and release if contract is violated
@@ -35,7 +35,7 @@ Examples included names like:
 - `get_node_path`
 - `export_attribute`
 
-These are not part of the canonical runtime schema in `fine_tuning/schemas/tools.json`.
+These are not part of the canonical runtime schema in `tools.json` (repo root).
 
 ### 3) Metrics were too permissive
 

@@ -1,0 +1,15 @@
+<ui:UXML xmlns:ui="UnityEngine.UIElements">
+  <ui:VisualElement class="unityllm-root">
+    <ui:Label name="UnityLlmTitleLabel" text="UnityLLM Assistant" />
+
+    <ui:VisualElement name="DockTabButtons" class="unityllm-dock-tab-buttons">
+      <ui:Button name="ChatTabButton" text="Chat" />
+      <ui:Button name="TimelineTabButton" text="Pending &amp; Timeline" />
+      <ui:Button name="SettingsTabButton" text="Settings" />
+    </ui:VisualElement>
+
+    <ui:VisualElement name="ChatTabContent" class="unityllm-tab-content" />
+    <ui:VisualElement name="TimelineTabContent" class="unityllm-tab-content" style="display: none;" />
+    <ui:VisualElement name="SettingsTabContent" class="unityllm-tab-content" style="display: none;" />
+  </ui:VisualElement>
+</ui:UXML>

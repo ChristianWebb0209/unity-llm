@@ -1,0 +1,10 @@
+{
+  "name": "UnityLLM.Editor",
+  "rootNamespace": "UnityLLM",
+  "references": [],
+  "includePlatforms": [
+    "Editor"
+  ],
+  "allowUnsafeCode": false,
+  "overrideReferences": false
+}

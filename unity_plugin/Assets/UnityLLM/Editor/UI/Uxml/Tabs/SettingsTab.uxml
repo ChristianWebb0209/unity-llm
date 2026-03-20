@@ -1,0 +1,21 @@
+<ui:UXML xmlns:ui="UnityEngine.UIElements">
+  <ui:VisualElement class="unityllm-settings-root" style="flex-grow: 1;">
+    <ui:Label text="Settings (V1 stub)" />
+    <ui:VisualElement style="height: 10px;" />
+
+    <ui:Label text="Backend base URL" />
+    <ui:TextField name="BackendUrlField" />
+
+    <ui:VisualElement style="height: 8px;" />
+
+    <ui:Toggle name="ToolsEnabledToggle" text="Tools enabled" />
+
+    <ui:VisualElement style="height: 8px;" />
+
+    <ui:Label text="Composer mode (agent or ask, optional)" />
+    <ui:TextField name="ComposerModeField" value=""/>
+
+    <ui:VisualElement style="height: 12px;" />
+    <ui:Button name="ApplySettingsButton" text="Apply" />
+  </ui:VisualElement>
+</ui:UXML>

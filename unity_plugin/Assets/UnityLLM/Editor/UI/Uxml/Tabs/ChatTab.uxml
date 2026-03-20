@@ -1,0 +1,12 @@
+<ui:UXML xmlns:ui="UnityEngine.UIElements">
+  <ui:VisualElement class="unityllm-chat-root" style="flex-grow: 1;">
+    <ui:ScrollView name="ChatMessages" class="unityllm-messages" />
+
+    <ui:Label name="ChatErrorLabel" text="" style="color: #ff6b6b; white-space: normal; display: none;" />
+
+    <ui:VisualElement class="unityllm-input-row" style="margin-top: 6px;">
+      <ui:TextField name="PromptInput" multiline="true" style="flex-grow: 1; min-height: 44px;" />
+      <ui:Button name="SendButton" text="Send" />
+    </ui:VisualElement>
+  </ui:VisualElement>
+</ui:UXML>

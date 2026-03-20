@@ -3,7 +3,7 @@
 Strict validator for Composer v3 datasets.
 
 Validates AGENT and ASK records against:
-- fine_tuning/schemas/tools.json
+- tools.json (repo root)
 - fine_tuning/schemas/composer_v3_tool_contract.json
 - fine_tuning/schemas/composer_v3_tool_aliases.json
 """
@@ -21,7 +21,7 @@ from typing import Any, Dict, Iterable, List, Optional, Tuple
 
 REPO_ROOT = Path(__file__).resolve().parents[3]
 DATA_DIR = REPO_ROOT / "fine_tuning" / "data" / "composer_v3"
-TOOLS_JSON = REPO_ROOT / "fine_tuning" / "schemas" / "tools.json"
+TOOLS_JSON = REPO_ROOT / "tools.json"
 CONTRACT_JSON = REPO_ROOT / "fine_tuning" / "schemas" / "composer_v3_tool_contract.json"
 ALIASES_JSON = REPO_ROOT / "fine_tuning" / "schemas" / "composer_v3_tool_aliases.json"
 

@@ -453,6 +453,68 @@ def _tool_check_errors(args: Dict[str, Any]) -> Dict[str, Any]:
     return _editor_payload("check_errors")
 
 
+#
+# --- Unity V1 tool-name alignment (stubs / aliases) ---
+#
+# The Unity editor plugin executes tool calls deterministically on the client side.
+# For V1, we add Unity tool names to the backend registry so fine-tuning and
+# tool-call planning can reference Unity-native names.
+#
+# These backend handlers are intentionally thin: they return an editor-tool
+# payload placeholder so the Unity plugin (or its stub executors) can handle the
+# actual action.
+
+
+def _tool_unity_editor_stub(tool_name: str, args: Dict[str, Any]) -> Dict[str, Any]:
+    out = _editor_payload(tool_name)
+    out.update(args)
+    return out
+
+
+def _tool_get_scene_hierarchy(args: Dict[str, Any]) -> Dict[str, Any]:
+    return _tool_unity_editor_stub("get_scene_hierarchy", args)
+
+
+def _tool_create_game_object(args: Dict[str, Any]) -> Dict[str, Any]:
+    return _tool_unity_editor_stub("create_game_object", args)
+
+
+def _tool_add_component(args: Dict[str, Any]) -> Dict[str, Any]:
+    return _tool_unity_editor_stub("add_component", args)
+
+
+def _tool_remove_component(args: Dict[str, Any]) -> Dict[str, Any]:
+    return _tool_unity_editor_stub("remove_component", args)
+
+
+def _tool_set_component_property(args: Dict[str, Any]) -> Dict[str, Any]:
+    return _tool_unity_editor_stub("set_component_property", args)
+
+
+def _tool_connect_ui_event(args: Dict[str, Any]) -> Dict[str, Any]:
+    return _tool_unity_editor_stub("connect_ui_event", args)
+
+
+def _tool_collect_compile_errors(args: Dict[str, Any]) -> Dict[str, Any]:
+    return _tool_unity_editor_stub("collect_compile_errors", args)
+
+
+def _tool_run_unity_editor_tests(args: Dict[str, Any]) -> Dict[str, Any]:
+    return _tool_unity_editor_stub("run_unity_editor_tests", args)
+
+
+def _tool_open_scene(args: Dict[str, Any]) -> Dict[str, Any]:
+    return _tool_unity_editor_stub("open_scene", args)
+
+
+def _tool_save_scene(args: Dict[str, Any]) -> Dict[str, Any]:
+    return _tool_unity_editor_stub("save_scene", args)
+
+
+def _tool_delete_game_object(args: Dict[str, Any]) -> Dict[str, Any]:
+    return _tool_unity_editor_stub("delete_game_object", args)
+
+
 def get_registered_tools() -> List[ToolDef]:
     """
     Return the list of tools available to the LLM.
@@ -929,6 +991,164 @@ def get_registered_tools() -> List[ToolDef]:
             description="Return the current editor Errors/Warnings panel content (script errors, etc.). Godot equivalent of linter output.",
             parameters={"type": "object", "properties": {}},
             handler=_tool_check_errors,
+        ),
+
+        # --- Unity V1 editor tool names (client-executed by Unity plugin) ---
+        ToolDef(
+            name="get_scene_hierarchy",
+            description="Return the current scene hierarchy snapshot so the model can reference GameObject paths.",
+            parameters={
+                "type": "object",
+                "properties": {
+                    "scene_path": {"type": "string", "description": "Optional scene path; omit for current open scene."}
+                },
+            },
+            handler=_tool_get_scene_hierarchy,
+        ),
+        ToolDef(
+            name="create_game_object",
+            description="Create a GameObject under a parent path in the scene.",
+            parameters={
+                "type": "object",
+                "properties": {
+                    "scene_path": {"type": "string", "description": "Optional scene path; omit for current open scene."},
+                    "parent_path": {"type": "string", "description": "Hierarchy parent path (e.g. /Canvas/Panel).", "default": "/"},
+                    "name": {"type": "string", "description": "GameObject name."},
+                    "local_position": {"type": "array", "items": {"type": "number"}, "description": "Optional [x,y,z] local position."},
+                    "local_rotation_euler": {"type": "array", "items": {"type": "number"}, "description": "Optional [x,y,z] local rotation Euler."},
+                    "local_scale": {"type": "array", "items": {"type": "number"}, "description": "Optional [x,y,z] local scale."},
+                },
+                "required": ["name"],
+            },
+            handler=_tool_create_game_object,
+        ),
+        ToolDef(
+            name="delete_game_object",
+            description="Delete a GameObject by hierarchy path with Undo support.",
+            parameters={
+                "type": "object",
+                "properties": {
+                    "scene_path": {"type": "string", "description": "Optional scene path."},
+                    "game_object_path": {"type": "string", "description": "Hierarchy path to object (e.g. /Canvas/Panel/Button)."},
+                },
+                "required": ["game_object_path"],
+            },
+            handler=_tool_delete_game_object,
+        ),
+        ToolDef(
+            name="add_component",
+            description="Add a component to a GameObject by type name.",
+            parameters={
+                "type": "object",
+                "properties": {
+                    "scene_path": {"type": "string", "description": "Optional scene path."},
+                    "game_object_path": {"type": "string", "description": "Hierarchy path to object."},
+                    "component_type": {"type": "string", "description": "Component type (e.g. BoxCollider, UnityEngine.UI.Button)."},
+                },
+                "required": ["game_object_path", "component_type"],
+            },
+            handler=_tool_add_component,
+        ),
+        ToolDef(
+            name="remove_component",
+            description="Remove a component from a GameObject by type or index.",
+            parameters={
+                "type": "object",
+                "properties": {
+                    "scene_path": {"type": "string", "description": "Optional scene path."},
+                    "game_object_path": {"type": "string", "description": "Hierarchy path to object."},
+                    "component_type": {"type": "string", "description": "Component type name."},
+                    "component_index": {"type": "integer", "description": "Optional index of component instance.", "minimum": 0},
+                },
+                "required": ["game_object_path"],
+            },
+            handler=_tool_remove_component,
+        ),
+        ToolDef(
+            name="set_component_property",
+            description="Set serialized component property on a target GameObject component.",
+            parameters={
+                "type": "object",
+                "properties": {
+                    "scene_path": {"type": "string", "description": "Optional scene path."},
+                    "game_object_path": {"type": "string", "description": "Hierarchy path to object."},
+                    "component_type": {"type": "string", "description": "Component type name."},
+                    "property_path": {"type": "string", "description": "Serialized property path, e.g. m_Text or speed"},
+                    "value": {"description": "New property value."},
+                },
+                "required": ["game_object_path", "component_type", "property_path", "value"],
+            },
+            handler=_tool_set_component_property,
+        ),
+        ToolDef(
+            name="connect_ui_event",
+            description="Wire a UnityEvent listener, e.g. Button.onClick to a target method.",
+            parameters={
+                "type": "object",
+                "properties": {
+                    "scene_path": {"type": "string", "description": "Optional scene path."},
+                    "source_game_object_path": {"type": "string", "description": "Hierarchy path of source object containing the event."},
+                    "component_type": {"type": "string", "description": "Source component type containing event."},
+                    "event_property_path": {"type": "string", "description": "Serialized UnityEvent property path, e.g. m_OnClick."},
+                    "target_game_object_path": {"type": "string", "description": "Hierarchy path of target object."},
+                    "target_component_type": {"type": "string", "description": "Optional target component type for method lookup."},
+                    "target_method_name": {"type": "string", "description": "Target method name."},
+                    "mode": {"type": "string", "enum": ["dynamic", "static"], "default": "dynamic"},
+                },
+                "required": ["source_game_object_path", "component_type", "event_property_path", "target_game_object_path", "target_method_name"],
+            },
+            handler=_tool_connect_ui_event,
+        ),
+        ToolDef(
+            name="collect_compile_errors",
+            description="Collect Unity C# compile diagnostics from editor compilation pipeline.",
+            parameters={
+                "type": "object",
+                "properties": {
+                    "include_warnings": {"type": "boolean", "default": True},
+                    "max_items": {"type": "integer", "default": 200, "minimum": 1, "maximum": 5000},
+                },
+            },
+            handler=_tool_collect_compile_errors,
+        ),
+        ToolDef(
+            name="run_unity_editor_tests",
+            description="Run Unity EditMode/PlayMode tests via Unity Test Runner API.",
+            parameters={
+                "type": "object",
+                "properties": {
+                    "test_mode": {"type": "string", "enum": ["EditMode", "PlayMode"], "default": "EditMode"},
+                    "assembly_names": {"type": "array", "items": {"type": "string"}, "default": []},
+                    "test_names": {"type": "array", "items": {"type": "string"}, "default": []},
+                    "run_synchronously": {"type": "boolean", "default": False},
+                },
+            },
+            handler=_tool_run_unity_editor_tests,
+        ),
+        ToolDef(
+            name="open_scene",
+            description="Open a Unity scene in editor.",
+            parameters={
+                "type": "object",
+                "properties": {
+                    "scene_path": {"type": "string", "description": "Scene path, e.g. Assets/Scenes/Main.unity"},
+                    "open_mode": {"type": "string", "enum": ["Single", "Additive"], "default": "Single"},
+                },
+                "required": ["scene_path"],
+            },
+            handler=_tool_open_scene,
+        ),
+        ToolDef(
+            name="save_scene",
+            description="Save current or target scene in editor.",
+            parameters={
+                "type": "object",
+                "properties": {
+                    "scene_path": {"type": "string", "description": "Optional destination scene path."},
+                    "save_as_copy": {"type": "boolean", "default": False},
+                },
+            },
+            handler=_tool_save_scene,
         ),
     ]
 

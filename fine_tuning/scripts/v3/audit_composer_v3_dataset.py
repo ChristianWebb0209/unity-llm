@@ -17,7 +17,7 @@ from typing import Any, Dict, Iterable, List, Tuple
 
 
 REPO_ROOT = Path(__file__).resolve().parents[3]
-TOOLS_JSON = REPO_ROOT / "fine_tuning" / "schemas" / "tools.json"
+TOOLS_JSON = REPO_ROOT / "tools.json"
 CONTRACT_JSON = REPO_ROOT / "fine_tuning" / "schemas" / "composer_v3_tool_contract.json"
 ALIASES_JSON = REPO_ROOT / "fine_tuning" / "schemas" / "composer_v3_tool_aliases.json"
 

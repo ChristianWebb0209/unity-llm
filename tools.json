@@ -1,0 +1,640 @@
+[
+  {
+    "name": "read_file",
+    "description": "Read full contents of a project file under Assets/. Use before patching or when user requests file content.",
+    "parameters": {
+      "type": "object",
+      "properties": {
+        "path": {
+          "type": "string",
+          "description": "Project-relative path, e.g. Assets/Scripts/PlayerController.cs"
+        }
+      },
+      "required": [
+        "path"
+      ]
+    }
+  },
+  {
+    "name": "create_file",
+    "description": "Create a file at path. If overwrite=false and file exists, tool should fail.",
+    "parameters": {
+      "type": "object",
+      "properties": {
+        "path": {
+          "type": "string",
+          "description": "Project-relative path, e.g. Assets/Scripts/NewScript.cs"
+        },
+        "content": {
+          "type": "string",
+          "description": "Optional initial content.",
+          "default": ""
+        },
+        "overwrite": {
+          "type": "boolean",
+          "description": "Whether to overwrite existing file.",
+          "default": false
+        }
+      },
+      "required": [
+        "path"
+      ]
+    }
+  },
+  {
+    "name": "write_file",
+    "description": "Write full content to file (full rewrite). Prefer apply_patch for targeted edits.",
+    "parameters": {
+      "type": "object",
+      "properties": {
+        "path": {
+          "type": "string",
+          "description": "Project-relative path, e.g. Assets/Scripts/PlayerController.cs"
+        },
+        "content": {
+          "type": "string",
+          "description": "Full content to write."
+        }
+      },
+      "required": [
+        "path",
+        "content"
+      ]
+    }
+  },
+  {
+    "name": "append_to_file",
+    "description": "Append content to an existing file. Creates file if missing.",
+    "parameters": {
+      "type": "object",
+      "properties": {
+        "path": {
+          "type": "string"
+        },
+        "content": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "path",
+        "content"
+      ]
+    }
+  },
+  {
+    "name": "apply_patch",
+    "description": "Targeted edit: replace old_string with new_string once, or apply unified diff in diff.",
+    "parameters": {
+      "type": "object",
+      "properties": {
+        "path": {
+          "type": "string"
+        },
+        "old_string": {
+          "type": "string"
+        },
+        "new_string": {
+          "type": "string"
+        },
+        "diff": {
+          "type": "string",
+          "description": "Unified diff patch text. If set, old_string/new_string may be omitted."
+        }
+      },
+      "required": [
+        "path"
+      ]
+    }
+  },
+  {
+    "name": "delete_file",
+    "description": "Delete file by path. Use only when requested or clearly needed.",
+    "parameters": {
+      "type": "object",
+      "properties": {
+        "path": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "path"
+      ]
+    }
+  },
+  {
+    "name": "list_directory",
+    "description": "List files/folders under a directory in the Unity project.",
+    "parameters": {
+      "type": "object",
+      "properties": {
+        "path": {
+          "type": "string",
+          "description": "Directory path, e.g. Assets or Assets/Scripts",
+          "default": "Assets"
+        },
+        "recursive": {
+          "type": "boolean",
+          "default": false
+        },
+        "max_entries": {
+          "type": "integer",
+          "default": 300,
+          "minimum": 1,
+          "maximum": 5000
+        },
+        "max_depth": {
+          "type": "integer",
+          "default": 8,
+          "minimum": 0,
+          "maximum": 30
+        }
+      }
+    }
+  },
+  {
+    "name": "list_files",
+    "description": "List file paths under a folder with optional extension filters.",
+    "parameters": {
+      "type": "object",
+      "properties": {
+        "path": {
+          "type": "string",
+          "default": "Assets"
+        },
+        "recursive": {
+          "type": "boolean",
+          "default": true
+        },
+        "extensions": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "default": []
+        },
+        "max_entries": {
+          "type": "integer",
+          "default": 1000,
+          "minimum": 1,
+          "maximum": 5000
+        }
+      }
+    }
+  },
+  {
+    "name": "search_files",
+    "description": "Find files containing query text under a root path.",
+    "parameters": {
+      "type": "object",
+      "properties": {
+        "query": {
+          "type": "string"
+        },
+        "root_path": {
+          "type": "string",
+          "default": "Assets"
+        },
+        "extensions": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "default": []
+        },
+        "max_matches": {
+          "type": "integer",
+          "default": 100,
+          "minimum": 1,
+          "maximum": 2000
+        }
+      },
+      "required": [
+        "query"
+      ]
+    }
+  },
+  {
+    "name": "grep_search",
+    "description": "Regex or literal search returning file/line/text matches.",
+    "parameters": {
+      "type": "object",
+      "properties": {
+        "pattern": {
+          "type": "string"
+        },
+        "query": {
+          "type": "string",
+          "description": "Alias for pattern."
+        },
+        "root_path": {
+          "type": "string",
+          "default": "Assets"
+        },
+        "extensions": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "default": []
+        },
+        "max_matches": {
+          "type": "integer",
+          "default": 200,
+          "minimum": 1,
+          "maximum": 5000
+        },
+        "use_regex": {
+          "type": "boolean",
+          "default": true
+        }
+      },
+      "required": [
+        "pattern"
+      ]
+    }
+  },
+  {
+    "name": "project_structure",
+    "description": "Return indexed project file paths under prefix without file content.",
+    "parameters": {
+      "type": "object",
+      "properties": {
+        "prefix": {
+          "type": "string",
+          "default": "Assets"
+        },
+        "max_paths": {
+          "type": "integer",
+          "default": 500,
+          "minimum": 1,
+          "maximum": 5000
+        },
+        "max_depth": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 20
+        }
+      }
+    }
+  },
+  {
+    "name": "find_references_to",
+    "description": "Find files that reference a specific asset/script path.",
+    "parameters": {
+      "type": "object",
+      "properties": {
+        "asset_path": {
+          "type": "string",
+          "description": "Path like Assets/Prefabs/Player.prefab or Assets/Scripts/PlayerController.cs"
+        }
+      },
+      "required": [
+        "asset_path"
+      ]
+    }
+  },
+  {
+    "name": "open_scene",
+    "description": "Open a Unity scene in editor using EditorSceneManager.OpenScene.",
+    "parameters": {
+      "type": "object",
+      "properties": {
+        "scene_path": {
+          "type": "string",
+          "description": "Scene path, e.g. Assets/Scenes/Main.unity"
+        },
+        "open_mode": {
+          "type": "string",
+          "enum": [
+            "Single",
+            "Additive"
+          ],
+          "default": "Single"
+        }
+      },
+      "required": [
+        "scene_path"
+      ]
+    }
+  },
+  {
+    "name": "save_scene",
+    "description": "Save currently open scene or target scene via EditorSceneManager.SaveScene.",
+    "parameters": {
+      "type": "object",
+      "properties": {
+        "scene_path": {
+          "type": "string",
+          "description": "Optional destination path. Omit to save current scene in place."
+        },
+        "save_as_copy": {
+          "type": "boolean",
+          "default": false
+        }
+      }
+    }
+  },
+  {
+    "name": "get_scene_hierarchy",
+    "description": "Return scene hierarchy snapshot: GameObject path, active state, and attached component types.",
+    "parameters": {
+      "type": "object",
+      "properties": {
+        "scene_path": {
+          "type": "string",
+          "description": "Optional scene path. Omit for current open scene."
+        },
+        "include_inactive": {
+          "type": "boolean",
+          "default": true
+        },
+        "max_nodes": {
+          "type": "integer",
+          "default": 3000,
+          "minimum": 1,
+          "maximum": 20000
+        }
+      }
+    }
+  },
+  {
+    "name": "create_game_object",
+    "description": "Create GameObject under parent path in scene. Supports Undo.",
+    "parameters": {
+      "type": "object",
+      "properties": {
+        "scene_path": {
+          "type": "string",
+          "description": "Optional scene path; omit for current open scene."
+        },
+        "parent_path": {
+          "type": "string",
+          "description": "Hierarchy path to parent, e.g. /Canvas/Panel",
+          "default": "/"
+        },
+        "name": {
+          "type": "string",
+          "description": "GameObject name."
+        },
+        "local_position": {
+          "type": "array",
+          "items": {
+            "type": "number"
+          },
+          "description": "Optional [x, y, z]"
+        },
+        "local_rotation_euler": {
+          "type": "array",
+          "items": {
+            "type": "number"
+          },
+          "description": "Optional [x, y, z]"
+        },
+        "local_scale": {
+          "type": "array",
+          "items": {
+            "type": "number"
+          },
+          "description": "Optional [x, y, z]"
+        }
+      },
+      "required": [
+        "name"
+      ]
+    }
+  },
+  {
+    "name": "delete_game_object",
+    "description": "Delete a GameObject by hierarchy path with Undo support.",
+    "parameters": {
+      "type": "object",
+      "properties": {
+        "scene_path": {
+          "type": "string"
+        },
+        "game_object_path": {
+          "type": "string",
+          "description": "Hierarchy path, e.g. /Canvas/Panel/Button"
+        }
+      },
+      "required": [
+        "game_object_path"
+      ]
+    }
+  },
+  {
+    "name": "add_component",
+    "description": "Add component to GameObject by type name (e.g. BoxCollider, Button, MyNamespace.MyComponent).",
+    "parameters": {
+      "type": "object",
+      "properties": {
+        "scene_path": {
+          "type": "string"
+        },
+        "game_object_path": {
+          "type": "string"
+        },
+        "component_type": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "game_object_path",
+        "component_type"
+      ]
+    }
+  },
+  {
+    "name": "remove_component",
+    "description": "Remove component from GameObject by type name or index.",
+    "parameters": {
+      "type": "object",
+      "properties": {
+        "scene_path": {
+          "type": "string"
+        },
+        "game_object_path": {
+          "type": "string"
+        },
+        "component_type": {
+          "type": "string"
+        },
+        "component_index": {
+          "type": "integer",
+          "minimum": 0
+        }
+      },
+      "required": [
+        "game_object_path"
+      ]
+    }
+  },
+  {
+    "name": "set_component_property",
+    "description": "Set serialized component property using SerializedObject/SerializedProperty. Supports bool/int/float/string/vector/color/object refs where possible.",
+    "parameters": {
+      "type": "object",
+      "properties": {
+        "scene_path": {
+          "type": "string"
+        },
+        "game_object_path": {
+          "type": "string"
+        },
+        "component_type": {
+          "type": "string"
+        },
+        "property_path": {
+          "type": "string",
+          "description": "Serialized property path, e.g. m_Text or m_OnClick"
+        },
+        "value": {
+          "description": "Value to set. Type must match serialized field/property."
+        }
+      },
+      "required": [
+        "game_object_path",
+        "component_type",
+        "property_path",
+        "value"
+      ]
+    }
+  },
+  {
+    "name": "connect_ui_event",
+    "description": "Wire UnityEvent listener, e.g. Button.onClick -> target method.",
+    "parameters": {
+      "type": "object",
+      "properties": {
+        "scene_path": {
+          "type": "string"
+        },
+        "source_game_object_path": {
+          "type": "string"
+        },
+        "component_type": {
+          "type": "string",
+          "description": "Component with the UnityEvent, e.g. UnityEngine.UI.Button"
+        },
+        "event_property_path": {
+          "type": "string",
+          "description": "Serialized UnityEvent property path, e.g. m_OnClick"
+        },
+        "target_game_object_path": {
+          "type": "string"
+        },
+        "target_component_type": {
+          "type": "string"
+        },
+        "target_method_name": {
+          "type": "string"
+        },
+        "mode": {
+          "type": "string",
+          "enum": [
+            "dynamic",
+            "static"
+          ],
+          "default": "dynamic"
+        }
+      },
+      "required": [
+        "source_game_object_path",
+        "component_type",
+        "event_property_path",
+        "target_game_object_path",
+        "target_method_name"
+      ]
+    }
+  },
+  {
+    "name": "collect_compile_errors",
+    "description": "Collect C# compile diagnostics from Unity editor compilation pipeline and return normalized errors/warnings.",
+    "parameters": {
+      "type": "object",
+      "properties": {
+        "include_warnings": {
+          "type": "boolean",
+          "default": true
+        },
+        "max_items": {
+          "type": "integer",
+          "default": 200,
+          "minimum": 1,
+          "maximum": 5000
+        }
+      }
+    }
+  },
+  {
+    "name": "run_unity_editor_tests",
+    "description": "Run Unity EditMode tests via Unity Test Runner API (TestRunnerApi).",
+    "parameters": {
+      "type": "object",
+      "properties": {
+        "test_mode": {
+          "type": "string",
+          "enum": [
+            "EditMode",
+            "PlayMode"
+          ],
+          "default": "EditMode"
+        },
+        "assembly_names": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "default": []
+        },
+        "test_names": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "default": []
+        },
+        "run_synchronously": {
+          "type": "boolean",
+          "default": false
+        }
+      }
+    }
+  },
+  {
+    "name": "fetch_url",
+    "description": "Fetch documentation/webpage content over HTTP(S).",
+    "parameters": {
+      "type": "object",
+      "properties": {
+        "url": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "url"
+      ]
+    }
+  },
+  {
+    "name": "run_terminal_command",
+    "description": "Run shell command and capture stdout/stderr for tooling, builds, and diagnostics.",
+    "parameters": {
+      "type": "object",
+      "properties": {
+        "command": {
+          "type": "string"
+        },
+        "timeout_seconds": {
+          "type": "integer",
+          "default": 60,
+          "minimum": 1,
+          "maximum": 900
+        }
+      },
+      "required": [
+        "command"
+      ]
+    }
+  }
+]

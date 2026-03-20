@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Export tool definitions from rag_service to fine_tuning/schemas/tools.json.
+Export tool definitions from rag_service to repo-root tools.json.
 Run from repo root (with rag_service deps installed, e.g. pip install -r rag_service/requirements.txt):
   python fine_tuning/scripts/export_tool_schema.py
 """
@@ -31,8 +31,7 @@ except Exception:
     # OPENAI_API_KEY is already set in the environment.
     pass
 
-SCHEMAS_DIR = REPO_ROOT / "fine_tuning" / "schemas"
-OUTPUT_FILE = SCHEMAS_DIR / "tools.json"
+OUTPUT_FILE = REPO_ROOT / "tools.json"
 
 
 def main() -> None:
@@ -64,7 +63,7 @@ def main() -> None:
             "parameters": t.parameters,
         })
 
-    SCHEMAS_DIR.mkdir(parents=True, exist_ok=True)
+    OUTPUT_FILE.parent.mkdir(parents=True, exist_ok=True)
     with open(OUTPUT_FILE, "w", encoding="utf-8") as f:
         json.dump(payload, f, indent=2)
 

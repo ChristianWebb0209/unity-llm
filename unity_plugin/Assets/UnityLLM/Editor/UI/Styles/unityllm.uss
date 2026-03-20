@@ -1,0 +1,32 @@
+.unityllm-root {
+    flex-direction: column;
+    padding-left: 6;
+    padding-right: 6;
+    padding-top: 6;
+    padding-bottom: 6;
+}
+
+.unityllm-messages {
+    flex-grow: 1;
+    min-height: 120px;
+    margin-bottom: 8px;
+}
+
+.unityllm-assistant-streaming {
+    white-space: normal;
+}
+
+.unityllm-input-row {
+    flex-direction: row;
+    gap: 6px;
+}
+
+.unityllm-dock-tab-buttons {
+    flex-direction: row;
+    gap: 6px;
+    margin-bottom: 6px;
+}
+
+.unityllm-tab-content {
+    flex-grow: 1;
+}

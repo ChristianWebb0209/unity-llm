@@ -77,7 +77,7 @@ Generate many short imperatives that require editor tool actions.
 Enforce:
 - assistant emits one or more `<tool_call>` blocks
 - each `<tool_call>` inner JSON parses
-- tool names exist in `fine_tuning/schemas/tools.json`
+- tool names exist in `tools.json` (repo root)
 - arguments are dictionaries and satisfy required keys (schema validation)
 
 ### 4) Validate the dataset strictly

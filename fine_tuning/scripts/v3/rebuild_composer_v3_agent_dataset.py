@@ -27,7 +27,7 @@ sys.path.insert(0, str(REPO_ROOT))
 from rag_service.app.prompts import COMPOSER_V2_SYSTEM_PROMPT_AGENT
 
 
-TOOLS_JSON = REPO_ROOT / "fine_tuning" / "schemas" / "tools.json"
+TOOLS_JSON = REPO_ROOT / "tools.json"
 CONTRACT_JSON = REPO_ROOT / "fine_tuning" / "schemas" / "composer_v3_tool_contract.json"
 ALIASES_JSON = REPO_ROOT / "fine_tuning" / "schemas" / "composer_v3_tool_aliases.json"
 
