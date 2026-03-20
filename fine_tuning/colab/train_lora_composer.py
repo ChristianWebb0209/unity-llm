@@ -77,7 +77,7 @@ DATA_DIR = DATA_ROOT
 COMPOSER_TRAIN = DATA_DIR / "train.jsonl"
 COMPOSER_VAL = DATA_DIR / "val.jsonl"
 
-BASE_MODEL_ID = os.environ.get("BASE_MODEL_ID", "Qwen/Qwen2.5-Coder-7B-Instruct")
+BASE_MODEL_ID = "Qwen/Qwen2.5-Coder-7B-Instruct"
 
 
 def _refresh_paths_from_cwd() -> None:
@@ -92,30 +92,29 @@ def _refresh_paths_from_cwd() -> None:
 def _maybe_setup_colab_repo_and_drive() -> None:
     """
     In Colab:
-    - optionally clone/update repo
-    - chdir into a Colab repo directory
+    - clone/update repo into a fixed directory
+    - chdir into the repo
     - mount Drive and set default output directories
     """
     if not Path("/content").exists():
         return
 
-    repo_dir = Path(os.environ.get("COLAB_REPO_DIR", "/content/unity-llm")).resolve()
+    repo_dir = Path("/content/unity-llm").resolve()
 
     if not repo_dir.exists():
-        clone_url = os.environ.get("REPO_CLONE_URL", "").strip()
-        if not clone_url:
-            raise SystemExit(
-                f"Colab repo not found at {repo_dir}. Set REPO_CLONE_URL to enable auto-clone, "
-                "or ensure the repo is already present in the runtime."
-            )
-        _run(["git", "clone", clone_url, str(repo_dir)])
+        _run(["git", "clone", "https://github.com/ChristianWebb0209/unity-llm", str(repo_dir)])
 
     # If repo exists and has a remote, try to update; otherwise continue.
     try:
         _run(["git", "fetch", "origin"], cwd=repo_dir)
         _run(["git", "reset", "--hard", "origin/master"], cwd=repo_dir)
     except Exception:
-        pass
+        # Repo might have no origin configured or branch might differ.
+        # Best-effort: attempt pull, then continue.
+        try:
+            _run(["git", "pull"], cwd=repo_dir)
+        except Exception:
+            pass
 
     os.chdir(repo_dir)
     _refresh_paths_from_cwd()
@@ -124,7 +123,7 @@ def _maybe_setup_colab_repo_and_drive() -> None:
         from google.colab import drive  # type: ignore
 
         drive.mount("/content/drive", force_remount=False)
-        base_dir = Path(os.environ.get("DRIVE_BASE_DIR", "/content/drive/MyDrive/unity-composer-v3-runs"))
+        base_dir = Path("/content/drive/MyDrive/unity-composer-v3-runs")
         checkpoint_dir = base_dir / "checkpoints"
         output_adapter_dir = base_dir / "adapter"
         model_cache_dir = base_dir / "models"
@@ -134,10 +133,11 @@ def _maybe_setup_colab_repo_and_drive() -> None:
         model_cache_dir.mkdir(parents=True, exist_ok=True)
         base_model_local_dir.mkdir(parents=True, exist_ok=True)
 
-        os.environ.setdefault("CHECKPOINT_DIR", str(checkpoint_dir))
-        os.environ.setdefault("OUTPUT_ADAPTER_DIR", str(output_adapter_dir))
-        os.environ.setdefault("HF_HOME", str(model_cache_dir))
-        os.environ.setdefault("BASE_MODEL_LOCAL_DIR", str(base_model_local_dir))
+        # Hardcode Colab paths (no env lookups for directories).
+        os.environ["CHECKPOINT_DIR"] = str(checkpoint_dir)
+        os.environ["OUTPUT_ADAPTER_DIR"] = str(output_adapter_dir)
+        os.environ["HF_HOME"] = str(model_cache_dir)
+        os.environ["BASE_MODEL_LOCAL_DIR"] = str(base_model_local_dir)
         print("CHECKPOINT_DIR =", os.environ["CHECKPOINT_DIR"])
         print("OUTPUT_ADAPTER_DIR =", os.environ["OUTPUT_ADAPTER_DIR"])
         print("BASE_MODEL_LOCAL_DIR =", os.environ["BASE_MODEL_LOCAL_DIR"])
@@ -202,16 +202,13 @@ def format_messages_example(example: Dict[str, Any]) -> str:
 
 
 def load_tokenizer_and_model() -> tuple[AutoTokenizer, AutoModelForCausalLM]:
-    base_model_local_dir = Path(os.environ.get("BASE_MODEL_LOCAL_DIR", "")).expanduser()
-    hf_home = os.environ.get("HF_HOME", "")
-    cache_dir = hf_home if hf_home else None
+    # Hardcoded Colab paths (avoid env lookups for directory selection).
+    base_model_local_dir = Path("/content/drive/MyDrive/unity-composer-v3-runs/models") / BASE_MODEL_ID.replace("/", "--")
+    cache_dir = str(base_model_local_dir.parent)
 
     local_ready = base_model_local_dir.is_dir() and (base_model_local_dir / "config.json").exists()
     if not local_ready:
-        if not base_model_local_dir:
-            # Fallback local dir in current workspace if BASE_MODEL_LOCAL_DIR is unset.
-            base_model_local_dir = REPO_ROOT / ".cache" / "models" / BASE_MODEL_ID.replace("/", "--")
-            base_model_local_dir.mkdir(parents=True, exist_ok=True)
+        base_model_local_dir.mkdir(parents=True, exist_ok=True)
         print(f"Base model not found locally, downloading to: {base_model_local_dir}")
         snapshot_download(
             repo_id=BASE_MODEL_ID,
@@ -299,7 +296,7 @@ def load_tokenizer_and_model() -> tuple[AutoTokenizer, AutoModelForCausalLM]:
 
 
 def build_trainer(tokenizer: AutoTokenizer, model: AutoModelForCausalLM, dataset: DatasetDict) -> SFTTrainer:
-    output_dir = os.environ.get("CHECKPOINT_DIR", "./unity-composer-v1-lora")
+    output_dir = "./unity-composer-v1-lora"
 
     training_args = TrainingArguments(
         output_dir=output_dir,
@@ -360,7 +357,8 @@ def main() -> None:
 
     trainer.train()
 
-    save_dir = os.environ.get("OUTPUT_ADAPTER_DIR", "unity-composer-v1-adapter")
+    # Save adapter into a fixed folder by default.
+    save_dir = "unity-composer-v1-adapter"
     trainer.model.save_pretrained(save_dir)
     tokenizer.save_pretrained(save_dir)
     print(f"Saved adapter to: {save_dir}")
