@@ -7,22 +7,21 @@ import sys
 import time
 import re
 from typing import Any, Dict, List, Optional, Tuple, Literal
+from typing import TypedDict
 
 from dotenv import load_dotenv
 from openai import OpenAI
 from fastapi import FastAPI, Request
 from fastapi.responses import StreamingResponse
-from pydantic import BaseModel
-
 from .services.repo_indexing import (
     get_inbound_refs,
     get_most_referenced_res_paths,
     get_repo_index_stats,
     list_indexed_paths,
 )
-from .tools.deps import GodotQueryDeps
+from .tools.deps import UnityQueryDeps
 from .tools import (
-    create_godot_agent,
+    create_unity_agent,
     dispatch_tool_call,
     get_openai_tools_payload,
     get_registered_tools,
@@ -46,7 +45,7 @@ from .services.context import (
     build_conversation_context,
     grep_project_files,
     list_project_directory,
-    read_project_godot_ini,
+    read_project_unity_ini,
     search_project_files,
     write_project_file,
 )
@@ -61,7 +60,7 @@ from .prompts import (
     COMPOSER_SYSTEM_PROMPT,
     COMPOSER_V2_SYSTEM_PROMPT_AGENT,
     COMPOSER_V2_SYSTEM_PROMPT_ASK,
-    GODOT_AGENT_SYSTEM_PROMPT,
+    UNITY_AGENT_SYSTEM_PROMPT,
 )
 
 
@@ -114,12 +113,12 @@ async def lifespan(app: FastAPI):
         pass
 
 
-app = FastAPI(title="Godot RAG Service", version="0.1.0", lifespan=lifespan)
-# NOTE: The Godot plugin is responsible for persisting state (usage, edit history, lint repair memory, and repo proximity).
-# To keep this backend stateless, we do not initialize SQLite-backed state at startup.
+app = FastAPI(title="Unity RAG Service", version="0.1.0", lifespan=lifespan)
+# NOTE: The Unity plugin is responsible for persisting state (usage, edit history, lint repair memory, and repo proximity).
+# To keep this backend stateless, we do not initialize server-side persistence at startup.
 
 
-class SourceChunk(BaseModel):
+class SourceChunk(TypedDict, total=False):
     """
     Minimal snippet metadata used in responses.
 
@@ -128,11 +127,11 @@ class SourceChunk(BaseModel):
     to preserve the response shape for 'snippets'.
     """
 
-    id: str = ""
-    source_path: str = ""
-    score: float = 0.0
-    text_preview: str = ""
-    metadata: Dict[str, Any] = {}
+    id: str
+    source_path: str
+    score: float
+    text_preview: str
+    metadata: Dict[str, Any]
 
 
 _openai_client: Optional[OpenAI] = None
@@ -238,35 +237,35 @@ def _openai_client_and_model(
     return client, model or default_model
 
 
-class QueryContext(BaseModel):
-    engine_version: Optional[str] = None
+class QueryContext(TypedDict, total=False):
+    engine_version: Optional[str]
     # Preferred script language for answers, based on the active file.
-    language: Optional[str] = None  # "gdscript" | "csharp"
-    selected_node_type: Optional[str] = None
-    current_script: Optional[str] = None
-    extra: Dict[str, Any] = {}
+    language: Optional[str]  # "gdscript" | "csharp"
+    selected_node_type: Optional[str]
+    current_script: Optional[str]
+    extra: Dict[str, Any]
 
 
-class QueryRequest(BaseModel):
+class QueryRequest(TypedDict, total=False):
     question: str
-    context: Optional[QueryContext] = None
-    top_k: int = 8
-    max_tool_rounds: Optional[int] = None  # default 5 when None; max tool-call rounds per request
+    context: Optional[QueryContext]
+    top_k: int  # default 8 when omitted
+    max_tool_rounds: Optional[int]  # default 5 when None; max tool-call rounds per request
     # Optional overrides from plugin settings (take precedence over env).
-    api_key: Optional[str] = None
-    model: Optional[str] = None
-    base_url: Optional[str] = None
+    api_key: Optional[str]
+    model: Optional[str]
+    base_url: Optional[str]
     # Composer v2 mode contract. When omitted, defaults to "agent".
-    composer_mode: Optional[Literal["agent", "ask"]] = None
+    composer_mode: Optional[Literal["agent", "ask"]]
 
 
-class QueryResponse(BaseModel):
+class QueryResponse(TypedDict, total=False):
     answer: str
     snippets: List[SourceChunk]
-    context_usage: Optional[Dict[str, Any]] = None
+    context_usage: Optional[Dict[str, Any]]
 
 
-class ToolCallResult(BaseModel):
+class ToolCallResult(TypedDict, total=False):
     tool_name: str
     arguments: Dict[str, Any]
     output: Any
@@ -274,12 +273,12 @@ class ToolCallResult(BaseModel):
 
 class QueryResponseWithTools(QueryResponse):
     # Optional structured record of any tools the model asked us to run.
-    tool_calls: List[ToolCallResult] = []
+    tool_calls: List[ToolCallResult]
 
 
 def _parse_composer_response(content: str) -> Tuple[str, List[Dict[str, Any]]]:
     """
-    Parse Godot Composer (fine-tuned) model output using the Composer v2 XML tool-call contract.
+    Parse Unity Composer (fine-tuned) model output using the Composer v2 XML tool-call contract.
 
     Tool calls are expressed as one or more XML blocks:
       <tool_call>{"name": "tool_name", "arguments": {...}}</tool_call>
@@ -342,9 +341,9 @@ def _parse_composer_response(content: str) -> Tuple[str, List[Dict[str, Any]]]:
     return answer, tool_calls
 
 
-def _extract_tool_calls_from_pydantic_result(result: Any) -> List[ToolCallResult]:
+def _extract_tool_calls_from_agent_result(result: Any) -> List[ToolCallResult]:
     """
-    Build List[ToolCallResult] from a Pydantic AI run result by walking all_messages()
+    Build List[ToolCallResult] from an agent run result by walking all_messages()
     and pairing ToolCallPart with ToolReturnPart in order.
     """
     out: List[ToolCallResult] = []
@@ -368,7 +367,7 @@ def _extract_tool_calls_from_pydantic_result(result: Any) -> List[ToolCallResult
                 return_contents.append(content)
     for i, (name, args) in enumerate(call_parts):
         output = return_contents[i] if i < len(return_contents) else None
-        out.append(ToolCallResult(tool_name=name, arguments=args, output=output))
+        out.append({"tool_name": name, "arguments": args, "output": output})
     return out
 
 
@@ -393,7 +392,7 @@ def _call_llm_with_rag(
     # Build a verbose reasoning-oriented answer if no LLM is available.
     if client is None:
         lines: List[str] = []
-        lines.append("This answer is grounded in your Godot docs and project code.\n")
+        lines.append("This answer is grounded in your Unity docs and project code.\n")
         lines.append(f"Question: {question}\n")
         if context_language:
             lines.append(f"Preferred language: {context_language}\n")
@@ -420,7 +419,7 @@ def _call_llm_with_rag(
     docs_block_lines: List[str] = []
     for d in docs:
         docs_block_lines.append(
-            "Official docs snippet from the Godot 4.x manual:\n"
+            "Official docs snippet from the Unity 4.x manual:\n"
             f"[DOC] path={d.source_path} meta={d.metadata}\n{d.text_preview}\n"
         )
     code_block_lines: List[str] = []
@@ -431,7 +430,7 @@ def _call_llm_with_rag(
         )
 
     system_prompt = (
-        "You are a Godot 4.x development assistant. "
+        "You are a Unity 4.x development assistant. "
         "You receive a user question plus retrieved documentation and real project code. "
         "Documentation snippets are the authoritative source for engine behavior and APIs. "
         "Example project code snippets are patterns/inspiration only and may reference project-specific types/addons/paths. "
@@ -490,7 +489,7 @@ def _call_llm_with_rag(
             completion_tokens=completion_tokens,
             context="rag_answer",
         )
-        # Usage persistence is handled client-side in the Godot plugin.
+        # Usage persistence is handled client-side in the Unity plugin.
 
     return completion.choices[0].message.content or ""
 
@@ -533,7 +532,7 @@ def _run_query_with_tools(
     # --- Context builder: ordered blocks + budgets (no docs/code RAG) ---
     # (Agent system instructions live in app.prompts.)
 
-    # Extract active file info from request context (sent by the Godot editor).
+    # Extract active file info from request context (sent by the Unity editor).
     active_file_path = None
     active_file_text = None
     active_scene_path: Optional[str] = None
@@ -543,8 +542,8 @@ def _run_query_with_tools(
     errors_text = None
     selected_node_type: Optional[str] = None
     if request_context is not None:
-        active_file_path = request_context.current_script or None
-        extra = request_context.extra or {}
+        active_file_path = request_context.get("current_script") or None
+        extra = request_context.get("extra") or {}
         active_file_text = extra.get("active_file_text") or None
         active_scene_path = (extra.get("active_scene_path") or "").strip() or None
         scene_root_class = (extra.get("scene_root_class") or "").strip() or None
@@ -552,8 +551,8 @@ def _run_query_with_tools(
         scene_tree = (extra.get("scene_tree") or "").strip() or None
         errors_text = extra.get("errors_text") or extra.get("lint_output") or None
         project_root_abs = extra.get("project_root_abs") or None
-        engine_version = request_context.engine_version or None
-        selected_node_type = (request_context.selected_node_type or "").strip() or None
+        engine_version = request_context.get("engine_version") or None
+        selected_node_type = (request_context.get("selected_node_type") or "").strip() or None
         exclude_block_keys_raw = extra.get("exclude_block_keys")
         exclude_block_keys = (
             list(exclude_block_keys_raw)
@@ -585,7 +584,7 @@ def _run_query_with_tools(
 
         if isinstance(provided_related_res_paths, list) and len(provided_related_res_paths) > 0:
             # Plugin computes one-hop structural proximity client-side.
-            # We only need to read the provided res:// paths and embed their text.
+            # We only need to read the provided Assets/ paths and embed their text.
             max_files = 4
             for p in provided_related_res_paths[:max_files]:
                 p_str = str(p).strip()
@@ -595,7 +594,7 @@ def _run_query_with_tools(
                 if content:
                     related_files.append((p_str, content))
         else:
-            # Fallback: server-side structural proximity (may index repo with SQLite).
+            # Fallback: server-side structural proximity using local JSON snapshot indexing.
             related_files = build_related_files_context(
                 project_root_abs=project_root_abs,
                 active_file_res_path=active_file_path,
@@ -618,7 +617,7 @@ def _run_query_with_tools(
         except Exception:
             pass
 
-    # Recent edits working set (previously SQLite-backed) is omitted in stateless mode.
+    # Recent edits working set is omitted in stateless mode.
     recent_edits_text: List[str] = []
 
     # Build dedicated ENVIRONMENT block (high priority, never dropped).
@@ -626,9 +625,9 @@ def _run_query_with_tools(
     # Context legend: so the LLM knows what it's dealing with (user's project vs reference).
     environment_parts.append(
         "CONTEXT SOURCES: "
-        "'Active file' = the file currently focused in the Godot editor (user's project, res:// path). "
+        "'Active file' = the file currently focused in the Unity editor (user's project, Assets/ path). "
         "'Related files' / 'Current scene scripts' / 'Open in editor' = also the user's project. "
-        "When editing or fixing a file, use the path shown (e.g. res://enemy.gd); call read_file(path) if you need full content."
+        "When editing or fixing a file, use the path shown (e.g. Assets/enemy.gd); call read_file(path) if you need full content."
     )
     if engine_version:
         environment_parts.append(f"engine: {engine_version}")
@@ -660,10 +659,10 @@ def _run_query_with_tools(
         environment_parts.append(f"Scene root class: {scene_root_class}.")
     if scene_tree:
         environment_parts.append("SCENE TREE:\n" + scene_tree)
-    # Optional project.godot summary (main scene, autoloads).
+    # Optional project.unity summary (main scene, autoloads).
     if project_root_abs:
         try:
-            proj_text = read_project_file(project_root_abs, "res://project.godot", max_bytes=32_000)
+            proj_text = read_project_file(project_root_abs, "Assets/project.unity", max_bytes=32_000)
             if proj_text:
                 main_scene: Optional[str] = None
                 autoloads: List[str] = []
@@ -688,31 +687,31 @@ def _run_query_with_tools(
                     environment_parts.append("Project autoloads: " + ", ".join(autoloads[:15]))
         except Exception:
             pass
-    # Godot API efficiency: short tips so the model generates idiomatic, efficient code.
+    # Unity API efficiency: short tips so the model generates idiomatic, efficient code.
     environment_parts.append(
-        "Godot API efficiency: Use _physics_process(delta) for movement; _process(delta) for UI/non-physics. "
+        "Unity API efficiency: Use _physics_process(delta) for movement; _process(delta) for UI/non-physics. "
         "Cache node refs (e.g. onready var x = $Path or get once in _ready()). Use signals for decoupling. "
         "Prefer move_and_slide/move_and_collide for physics bodies; use call_deferred when modifying scene tree from callbacks. "
         "GDScript (.gd) files have exactly one 'extends ClassName' line at the top; when editing or writing a .gd file, never add a second extends—the file already has one. "
-        "When fixing lint: Godot reports one error at a time; lint is re-run after each fix, so you may receive another message with the next error—fix the current one; more may follow."
+        "When fixing lint: Unity reports one error at a time; lint is re-run after each fix, so you may receive another message with the next error—fix the current one; more may follow."
     )
     environment_text = "\n".join(environment_parts) if environment_parts else None
 
-    system_prompt = GODOT_AGENT_SYSTEM_PROMPT
+    system_prompt = UNITY_AGENT_SYSTEM_PROMPT
     is_obscure = False
     optional_extras: List[str] = []
     if context_language:
         optional_extras.append(f"Preferred language: {context_language}")
     # Conversation history (plugin sends last N turns for multi-turn continuity).
-    if request_context and request_context.extra:
-        conv_raw = request_context.extra.get("conversation_history")
+    if request_context and request_context.get("extra"):
+        conv_raw = (request_context.get("extra") or {}).get("conversation_history")
         if conv_raw is not None and isinstance(conv_raw, list) and len(conv_raw) > 0:
             conv_block = build_conversation_context(conv_raw)
             if conv_block:
                 optional_extras.append("Recent conversation (for continuity):\n" + conv_block)
-    # Open script tabs: first ~24 lines of top 5 scripts open in the Godot editor (aggressive context).
-    if request_context and request_context.extra:
-        open_preview_raw = request_context.extra.get("open_scripts_preview")
+    # Open script tabs: first ~24 lines of top 5 scripts open in the Unity editor (aggressive context).
+    if request_context and request_context.get("extra"):
+        open_preview_raw = (request_context.get("extra") or {}).get("open_scripts_preview")
         if open_preview_raw and isinstance(open_preview_raw, list) and len(open_preview_raw) > 0:
             parts: List[str] = []
             for item in open_preview_raw[:5]:
@@ -723,20 +722,20 @@ def _run_query_with_tools(
                         parts.append(f"--- Open in editor: {path_val} (first 24 lines) ---\n{prev}")
             if parts:
                 optional_extras.append(
-                    "Scripts currently open in the Godot Script Editor (user's project; res:// paths; first 24 lines each). "
+                    "Scripts currently open in the Unity Script Editor (user's project; Assets/ paths; first 24 lines each). "
                     "Call read_file(path) for full content before editing.\n\n"
                     + "\n\n".join(parts)
                 )
     # User-dragged context: files/nodes dropped into the chat (FileSystem, Scene tree, Script list).
-    extra = (request_context.extra or {}) if request_context else {}
+    extra = (request_context.get("extra") or {}) if request_context else {}
     pinned_context_note = extra.get("pinned_context_note")
     drag_intro = (
         str(pinned_context_note).strip()
         if pinned_context_note
         else "The user just dragged these items into context for this chat. Prioritize them when answering."
     )
-    if request_context and request_context.extra:
-        pinned_files_raw = request_context.extra.get("pinned_files")
+    if request_context and request_context.get("extra"):
+        pinned_files_raw = (request_context.get("extra") or {}).get("pinned_files")
         if pinned_files_raw and isinstance(pinned_files_raw, list) and len(pinned_files_raw) > 0:
             parts = []
             for item in pinned_files_raw[:12]:
@@ -747,7 +746,7 @@ def _run_query_with_tools(
                         parts.append(f"--- Pinned file (user-dragged): {path_val} ---\n{content or '(empty)'}")
             if parts:
                 optional_extras.append(drag_intro + "\n\nPinned files:\n\n" + "\n\n".join(parts))
-        pinned_nodes_raw = request_context.extra.get("pinned_nodes")
+        pinned_nodes_raw = (request_context.get("extra") or {}).get("pinned_nodes")
         if pinned_nodes_raw and isinstance(pinned_nodes_raw, list) and len(pinned_nodes_raw) > 0:
             parts = []
             for item in pinned_nodes_raw[:20]:
@@ -762,7 +761,7 @@ def _run_query_with_tools(
                         parts.append(line)
             if parts:
                 optional_extras.append(drag_intro + "\n\nPinned nodes/scene:\n\n" + "\n".join(parts))
-        pinned_selections_raw = request_context.extra.get("pinned_selections")
+        pinned_selections_raw = (request_context.get("extra") or {}).get("pinned_selections")
         if pinned_selections_raw and isinstance(pinned_selections_raw, list) and len(pinned_selections_raw) > 0:
             parts = []
             for item in pinned_selections_raw[:20]:
@@ -788,15 +787,15 @@ def _run_query_with_tools(
             "- 'Expected type specifier after \"is\"': Use == null or != null for null checks, not 'is null'. "
             "The 'is' keyword is only for type checks (e.g. if x is Node2D). Replace 'if x is null' with 'if x == null' and 'if x is not null' with 'if x != null'.\n"
             "- 'Member \"velocity\" redefined': CharacterBody2D/CharacterBody3D already have a built-in 'velocity' property. Remove the duplicate 'var velocity: Vector2 = ...' or 'var velocity: Vector3 = ...' declaration; use the built-in property.\n"
-            "- 'Too many arguments for move_and_slide()': In Godot 4, move_and_slide() takes no arguments. Set the node's 'velocity' property, then call move_and_slide() with no args. Do not assign the return value to velocity (it returns a bool).\n"
+            "- 'Too many arguments for move_and_slide()': In Unity 4, move_and_slide() takes no arguments. Set the node's 'velocity' property, then call move_and_slide() with no args. Do not assign the return value to velocity (it returns a bool).\n"
             "- 'Assignment is not allowed inside an expression': You cannot assign and use in the same expression; split into two statements or fix the invalid syntax."
         )
         optional_extras.append(gd4_rules)
     # Client-owned lint repair memory:
     # The plugin computes `context.extra.lint_repair_memory` locally and injects it here.
-    # This keeps the hosted backend stateless (no SQLite-backed repair-memory queries).
+    # This keeps the hosted backend stateless (no server-side repair-memory queries).
     try:
-        extra = request_context.extra if request_context else {}
+        extra = (request_context.get("extra") or {}) if request_context else {}
         if isinstance(extra, dict):
             lint_repair_memory = extra.get("lint_repair_memory")
             if isinstance(lint_repair_memory, str) and lint_repair_memory.strip():
@@ -854,7 +853,7 @@ def _run_query_with_tools(
         "read_import_options(path) to see import settings; modify_attribute(target_type='import', path=..., attribute=..., value=...) to change them (e.g. attribute=compress, value=true for lossless SVG). "
         "Use modify_attribute(target_type='node', scene_path=..., node_path=..., attribute=..., value=...) for node properties. "
         "For create_node: use the current scene (omit scene_path or pass 'current') and parent_path /root. Use 2D node types (Node2D, CharacterBody2D, Sprite2D) in 2D scenes and 3D types (Node3D, CharacterBody3D) in 3D scenes.\n"
-        "To add a script to a node: create_script(path, extends_class, initial_content), then modify_attribute(target_type='node', scene_path=..., node_path=..., attribute='script', value='res://path/to/script.gd').\n"
+        "To add a script to a node: create_script(path, extends_class, initial_content), then modify_attribute(target_type='node', scene_path=..., node_path=..., attribute='script', value='Assets/path/to/script.gd').\n"
         "For fixes/edits: read_file(path) first, then apply_patch(path, old_string, new_string) or write_file(path, content). You will receive written content in the tool result; do not call read_file to verify. "
         "In GDScript (.gd) files the first line is already 'extends ClassName'; when using write_file or apply_patch on a .gd file, do not add or duplicate an extends line—only one extends per script. "
         "If the existing context is enough, answer directly.\n"
@@ -862,16 +861,16 @@ def _run_query_with_tools(
 
     # Pydantic AI agent: single run with tools; tool execution via execute_tool (tool_runner).
     read_file_cache: Dict[str, str] = {}
-    deps = GodotQueryDeps(
+    deps = UnityQueryDeps(
         project_root_abs=project_root_abs,
         active_scene_path=active_scene_path,
         active_file_path=active_file_path,
-        extra=(request_context.extra or {}) if request_context else {},
+        extra=(request_context.get("extra") or {}) if request_context else {},
         read_file_cache=read_file_cache,
     )
-    agent = create_godot_agent(model=model_override or model)
+    agent = create_unity_agent(model=model_override or model)
     result = agent.run_sync(user_content, deps=deps)
-    tool_call_results = _extract_tool_calls_from_pydantic_result(result)
+    tool_call_results = _extract_tool_calls_from_agent_result(result)
     answer = (result.output or "").strip()
     usage_obj = build_context_usage(
         model,
@@ -888,7 +887,7 @@ def _run_query_with_tools(
                 completion_tokens=int(total_completion_tokens),
                 context="query_with_tools",
             )
-            # Usage persistence is handled client-side in the Godot plugin.
+            # Usage persistence is handled client-side in the Unity plugin.
     # OpenViking: commit this turn for memory extraction (fire-and-forget).
     if chat_id and answer:
         try:
@@ -921,7 +920,7 @@ def _run_composer_query(
     composer_mode: Optional[Literal["agent", "ask"]] = None,
 ) -> Tuple[str, List[SourceChunk], List[ToolCallResult], Dict[str, Any]]:
     """
-    Godot Composer v2: single-turn call to a fine-tuned model that outputs tool calls directly
+    Unity Composer v2: single-turn call to a fine-tuned model that outputs tool calls directly
     (no RAG, no tool loop). Parses <tool_call>...</tool_call> blocks.
     """
     client, model = _openai_client_and_model(
@@ -929,13 +928,13 @@ def _run_composer_query(
     )
     if client is None:
         return (
-            "No Composer model configured. Set API key and model (e.g. godot-composer) in settings.",
+            "No Composer model configured. Set API key and model (e.g. unity-composer) in settings.",
             [],
             [],
             {"model": "", "limit_tokens": 0, "estimated_prompt_tokens": 0, "percent": 0.0},
         )
 
-    extra = (request_context.extra or {}) if request_context else {}
+    extra = (request_context.get("extra") or {}) if request_context else {}
     mode = composer_mode or "agent"
     system_prompt = (
         COMPOSER_V2_SYSTEM_PROMPT_ASK if mode == "ask" else (COMPOSER_V2_SYSTEM_PROMPT_AGENT or COMPOSER_SYSTEM_PROMPT)
@@ -951,8 +950,8 @@ def _run_composer_query(
         user_parts.append("Current scene: " + str(extra["active_scene_path"]))
     if extra.get("scene_dimension"):
         user_parts.append("Scene type: " + str(extra["scene_dimension"]))
-    if request_context and request_context.current_script:
-        user_parts.append("Active script: " + str(request_context.current_script))
+    if request_context and request_context.get("current_script"):
+        user_parts.append("Active script: " + str(request_context.get("current_script")))
     conv = extra.get("conversation_history")
     if conv and isinstance(conv, list) and len(conv) > 0:
         conv_lines = []
@@ -985,11 +984,15 @@ def _run_composer_query(
     prompt_tokens = getattr(usage, "prompt_tokens", None) or getattr(usage, "input_tokens", None) or 0
     completion_tokens = getattr(usage, "completion_tokens", None) or getattr(usage, "output_tokens", None) or 0
     if usage:
-        # Usage persistence is handled client-side in the Godot plugin.
+        # Usage persistence is handled client-side in the Unity plugin.
         pass
     answer, raw_tool_calls = _parse_composer_response(content)
     tool_results: List[ToolCallResult] = [
-        ToolCallResult(tool_name=tc["name"], arguments=tc.get("arguments") or {}, output=None)
+        {
+            "tool_name": tc["name"],
+            "arguments": tc.get("arguments") or {},
+            "output": None,
+        }
         for tc in raw_tool_calls
     ]
     limit = get_context_limit(model)
@@ -1005,7 +1008,7 @@ def _run_composer_query(
 @app.get("/health")
 async def health() -> Dict[str, str]:
     """
-    Simple health check so the Godot plugin can verify connectivity.
+    Simple health check so the Unity plugin can verify connectivity.
     """
     return {"status": "ok"}
 
@@ -1014,7 +1017,7 @@ async def health() -> Dict[str, str]:
 async def test_backends() -> Dict[str, Any]:
     """
     Return backend identifiers, endpoints, and default models for testing and UI.
-    Use this to switch between RAG (GPT-4.1-mini) and Godot Composer easily.
+    Use this to switch between RAG (GPT-4.1-mini) and Unity Composer easily.
     """
     default_model = os.getenv("OPENAI_MODEL", "gpt-4.1-mini")
     composer_model = os.getenv("COMPOSER_MODEL") or default_model
@@ -1029,21 +1032,21 @@ async def test_backends() -> Dict[str, Any]:
             "endpoint": "/composer/query",
             "stream_endpoint": "/composer/query_stream_with_tools",
             "default_model": composer_model,
-            "description": "Godot Composer fine-tuned model, tool_calls in response",
+            "description": "Unity Composer fine-tuned model, tool_calls in response",
         },
     }
 
 
-class IndexStatusResponse(BaseModel):
-    chroma_docs: int = 0
-    chroma_project_code: int = 0
-    repo_index_error: Optional[str] = None
-    repo_index_files: Optional[int] = None
-    repo_index_edges: Optional[int] = None
+class IndexStatusResponse(TypedDict, total=False):
+    chroma_docs: int
+    chroma_project_code: int
+    repo_index_error: Optional[str]
+    repo_index_files: Optional[int]
+    repo_index_edges: Optional[int]
 
 
-@app.get("/index_status", response_model=IndexStatusResponse)
-async def index_status(project_root: Optional[str] = None) -> IndexStatusResponse:
+@app.get("/index_status")
+async def index_status(project_root: Optional[str] = None) -> Dict[str, Any]:
     """
     Return indexing facts for optional repo index stats.
 
@@ -1051,79 +1054,79 @@ async def index_status(project_root: Optional[str] = None) -> IndexStatusRespons
     docs/project_code via rag_core.get_collections(). That retrieval path is now
     deprecated and removed; chroma_* fields are always 0.
     """
-    out = IndexStatusResponse(
-        chroma_docs=0,
-        chroma_project_code=0,
-    )
-    # Deprecated: the Godot plugin now owns repo proximity indexing.
+    out: Dict[str, Any] = {
+        "chroma_docs": 0,
+        "chroma_project_code": 0,
+    }
+    # Deprecated: the Unity plugin now owns repo proximity indexing.
     # We keep this endpoint for backward compatibility with older UI versions.
     if project_root and project_root.strip():
-        out.repo_index_error = "Deprecated: repo index stats are client-side in the Godot plugin."
+        out["repo_index_error"] = "Deprecated: repo index stats are client-side in the Unity plugin."
     return out
 
 
-class FileChangeIn(BaseModel):
+class FileChangeIn(TypedDict, total=False):
     file_path: str
-    change_type: str = "modify"
-    old_content: str = ""
-    new_content: str = ""
+    change_type: str  # default "modify"
+    old_content: str
+    new_content: str
 
 
-class EditEventIn(BaseModel):
-    actor: str = "ai"
-    trigger: str = "tool_action"
+class EditEventIn(TypedDict, total=False):
+    actor: str  # default "ai"
+    trigger: str  # default "tool_action"
     summary: str
-    prompt: Optional[str] = None
+    prompt: Optional[str]
     changes: List[FileChangeIn]
-    semantic_summary: Optional[str] = None
-    lint_errors_before: Optional[str] = None
-    lint_errors_after: Optional[str] = None
-    retrieved_chunk_ids: Optional[List[str]] = None
+    semantic_summary: Optional[str]
+    lint_errors_before: Optional[str]
+    lint_errors_after: Optional[str]
+    retrieved_chunk_ids: Optional[List[str]]
 
 
-class UndoResponse(BaseModel):
-    tool_calls: List[ToolCallResult] = []
+class UndoResponse(TypedDict, total=False):
+    tool_calls: List[ToolCallResult]
 
 
-class LintFixIn(BaseModel):
+class LintFixIn(TypedDict, total=False):
     project_root_abs: str
-    file_path: str  # res://...
+    file_path: str  # Assets/...
     engine_version: str
     raw_lint_output: str
     old_content: str
     new_content: str
-    prompt: Optional[str] = None
+    prompt: Optional[str]
 
 
 @app.post("/lint_memory/record_fix")
 async def lint_memory_record_fix(payload: LintFixIn) -> Dict[str, Any]:
-    # Deprecated: lint repair memory is stored locally in the Godot plugin (user://).
+    # Deprecated: lint repair memory is stored locally in the Unity plugin (user://).
     return {"ok": False, "error": "deprecated: lint_memory is client-owned"}
 
 
 @app.get("/lint_memory/search")
 async def lint_memory_search(engine_version: str, raw_lint_output: str, limit: int = 3) -> Dict[str, Any]:
-    # Deprecated: lint repair memory is stored locally in the Godot plugin (user://).
+    # Deprecated: lint repair memory is stored locally in the Unity plugin (user://).
     return {"ok": False, "results": []}
 
 
-class LintRequest(BaseModel):
-    """Request to run Godot script linter on a file. Run from backend to avoid spawning Godot from inside the editor (which can crash)."""
+class LintRequest(TypedDict, total=False):
+    """Request to run Unity script linter on a file. Run from backend to avoid spawning Unity from inside the editor (which can crash)."""
     project_root_abs: str
-    path: str  # res://path or path relative to project
+    path: str  # Assets/path or path relative to project
 
 
-def _get_godot_bin() -> str:
-    """Godot executable for headless lint. Prefer GODOT_BIN env; else 'godot' (or godot.exe on Windows)."""
-    bin_path = os.getenv("GODOT_BIN", "").strip()
+def _get_unity_bin() -> str:
+    """Unity executable for headless lint. Prefer UNITY_BIN env; else 'unity' (or unity.exe on Windows)."""
+    bin_path = os.getenv("UNITY_BIN", "").strip()
     if bin_path:
         return bin_path
     if sys.platform == "win32":
-        return "godot.exe"
-    return "godot"
+        return "unity.exe"
+    return "unity"
 
 
-# Timeout for headless Godot lint (prevents hang/crash from infinite loops or slow load).
+# Timeout for headless Unity lint (prevents hang/crash from infinite loops or slow load).
 _LINT_SUBPROCESS_TIMEOUT_SECONDS = 60.0
 
 # Cache for /lint: (project_root, path, mtime) -> (result, timestamp). TTL in seconds.
@@ -1141,17 +1144,17 @@ def _lint_cache_key(project_root: str, path: str) -> tuple[str, str, float]:
 
 
 @app.post("/lint")
-async def run_lint(payload: LintRequest) -> Dict[str, Any]:
+async def run_lint(payload: Dict[str, Any]) -> Dict[str, Any]:
     """
-    Run Godot headless linter (--script path --check-only) on a script file.
+    Run Unity headless linter (--script path --check-only) on a script file.
     Uses the same parser as the editor so errors match what the user sees.
-    Called by the plugin so the editor never spawns a second Godot process (which can crash).
+    Called by the plugin so the editor never spawns a second Unity process (which can crash).
     Do not use --debug: it can cause infinite loops when the script has parser errors.
-    Results are cached by (project_root, path, mtime) for 10s to avoid redundant Godot spawns.
+    Results are cached by (project_root, path, mtime) for 10s to avoid redundant Unity spawns.
     """
-    project_root = (payload.project_root_abs or "").strip().rstrip("/\\")
-    path = (payload.path or "").strip().replace("\\", "/")
-    if path.startswith("res://"):
+    project_root = str(payload.get("project_root_abs") or "").strip().rstrip("/\\")
+    path = str(payload.get("path") or "").strip().replace("\\", "/")
+    if path.startswith("Assets/"):
         path = path[6:].lstrip("/")
     if not project_root or not path:
         return {"success": False, "output": "project_root_abs and path are required", "exit_code": -1}
@@ -1164,10 +1167,10 @@ async def run_lint(payload: LintRequest) -> Dict[str, Any]:
         if (now - cached_at) < _LINT_CACHE_TTL_SECONDS:
             return cached_result
         del _lint_cache[cache_key]
-    godot_bin = _get_godot_bin()
-    # Godot docs: --check-only must be used with --script. Path is relative to project (res://).
+    unity_bin = _get_unity_bin()
+    # Unity docs: --check-only must be used with --script. Path is relative to project (Assets/).
     # --editor loads the project for full type checking; --headless avoids GUI. No --debug (can hang on errors).
-    args = [godot_bin, "--headless", "--editor", "--path", project_root, "--script", path, "--check-only"]
+    args = [unity_bin, "--headless", "--editor", "--path", project_root, "--script", path, "--check-only"]
     try:
         proc = await asyncio.create_subprocess_exec(
             *args,
@@ -1184,7 +1187,7 @@ async def run_lint(payload: LintRequest) -> Dict[str, Any]:
             await proc.wait()
             return {
                 "success": False,
-                "output": f"Lint timed out after {int(_LINT_SUBPROCESS_TIMEOUT_SECONDS)}s. Godot may have hung (try simplifying the script or set GODOT_BIN to a stable build).",
+                "output": f"Lint timed out after {int(_LINT_SUBPROCESS_TIMEOUT_SECONDS)}s. Unity may have hung (try simplifying the script or set UNITY_BIN to a stable build).",
                 "exit_code": -1,
             }
         out = (stdout_bytes or b"").decode("utf-8", errors="replace") + (stderr_bytes or b"").decode("utf-8", errors="replace")
@@ -1195,7 +1198,7 @@ async def run_lint(payload: LintRequest) -> Dict[str, Any]:
     except FileNotFoundError:
         return {
             "success": False,
-            "output": f"Godot not found: {godot_bin}. Set GODOT_BIN to the full path to the Godot editor executable.",
+            "output": f"Unity not found: {unity_bin}. Set UNITY_BIN to the full path to the Unity editor executable.",
             "exit_code": -1,
         }
     except Exception as e:
@@ -1204,13 +1207,13 @@ async def run_lint(payload: LintRequest) -> Dict[str, Any]:
 
 @app.post("/edit_events/create")
 async def edit_events_create(payload: EditEventIn) -> Dict[str, Any]:
-    # Deprecated: edit history is stored locally in the Godot plugin (user://).
+    # Deprecated: edit history is stored locally in the Unity plugin (user://).
     return {"ok": False, "error": "deprecated: edit_events are client-owned"}
 
 
 @app.get("/edit_events/list")
 async def edit_events_list(limit: int = 500) -> Dict[str, Any]:
-    # Deprecated: edit history is stored locally in the Godot plugin (user://).
+    # Deprecated: edit history is stored locally in the Unity plugin (user://).
     return {"ok": False, "events": []}
 
 
@@ -1220,7 +1223,7 @@ async def usage() -> Dict[str, Any]:
     Return aggregated token usage and estimated cost (from usage_log).
     Used by the Edit History tab to show tokens and cost at the bottom.
     """
-    # Deprecated: token usage is tracked locally in the Godot plugin (user://).
+    # Deprecated: token usage is tracked locally in the Unity plugin (user://).
     return {
         "ok": False,
         "total_prompt_tokens": 0,
@@ -1233,49 +1236,56 @@ async def usage() -> Dict[str, Any]:
 
 @app.get("/edit_events/{edit_id}")
 async def edit_events_get(edit_id: int) -> Dict[str, Any]:
-    # Deprecated: edit history is stored locally in the Godot plugin (user://).
+    # Deprecated: edit history is stored locally in the Unity plugin (user://).
     return {"ok": False, "error": "deprecated: edit_events are client-owned"}
 
 
-@app.post("/edit_events/undo/{edit_id}", response_model=UndoResponse)
-async def edit_events_undo(edit_id: int) -> UndoResponse:
-    # Deprecated: undo is handled locally in the Godot plugin.
-    return UndoResponse(tool_calls=[])
+@app.post("/edit_events/undo/{edit_id}")
+async def edit_events_undo(edit_id: int) -> Dict[str, Any]:
+    # Deprecated: undo is handled locally in the Unity plugin.
+    return {"tool_calls": []}
 
 
-@app.post("/query", response_model=QueryResponseWithTools)
-async def query_rag(payload: QueryRequest, request: Request) -> QueryResponseWithTools:
+@app.post("/query")
+async def query_rag(payload: Dict[str, Any], request: Request) -> Dict[str, Any]:
     """
     RAG endpoint that:
     - Uses retrieved documentation + example project code snippets (vector retrieval is removed in this repo).
     - Builds a context window and answers the question.
     """
     client_host = request.client.host if request.client else "unknown"
-    _log_rag_request("POST /query", client_host, payload.question or "", _cyan)
+    question = str(payload.get("question") or "").strip()
+    _log_rag_request("POST /query", client_host, question, _cyan)
 
-    question = payload.question.strip()
-    context_language = payload.context.language if payload.context else None
+    context = payload.get("context") if isinstance(payload.get("context"), dict) else None
+    context_language = context.get("language") if context else None
+    top_k = int(payload.get("top_k") or 8)
+    max_tool_rounds = payload.get("max_tool_rounds")
+    max_tool_rounds_int = int(max_tool_rounds) if max_tool_rounds is not None else 5
+    api_key = payload.get("api_key")
+    base_url = payload.get("base_url")
+    model_override = payload.get("model")
 
     def run():
         return _run_query_with_tools(
             question=question,
             context_language=context_language,
-            request_context=payload.context,
-            top_k=payload.top_k,
-            max_tool_rounds=payload.max_tool_rounds if payload.max_tool_rounds is not None else 5,
-            api_key=payload.api_key,
-            base_url=payload.base_url,
-            model_override=payload.model,
+            request_context=context,
+            top_k=top_k,
+            max_tool_rounds=max_tool_rounds_int,
+            api_key=api_key,
+            base_url=base_url,
+            model_override=model_override,
         )
 
     answer, snippets, tool_calls, context_usage = await asyncio.to_thread(run)
 
-    return QueryResponseWithTools(
-        answer=answer,
-        snippets=snippets,
-        tool_calls=tool_calls,
-        context_usage=context_usage,
-    )
+    return {
+        "answer": answer,
+        "snippets": snippets,
+        "tool_calls": tool_calls,
+        "context_usage": context_usage,
+    }
 
 
 # Sentinel line the plugin uses to parse tool_calls from the stream.
@@ -1283,28 +1293,35 @@ _STREAM_TOOL_CALLS_PREFIX = "\n__TOOL_CALLS__\n"
 
 
 @app.post("/query_stream_with_tools")
-async def query_stream_with_tools(payload: QueryRequest, request: Request):
+async def query_stream_with_tools(payload: Dict[str, Any], request: Request):
     """
     Same as /query (RAG + tools) but streams the answer in chunks, then appends
     a line __TOOL_CALLS__\\n + JSON array of tool_calls. Use when editor actions
     are enabled so the user sees progressive output and still gets tool execution.
     """
     client_host = request.client.host if request.client else "unknown"
-    _log_rag_request("POST /query_stream_with_tools", client_host, payload.question or "", _green)
+    question = str(payload.get("question") or "").strip()
+    _log_rag_request("POST /query_stream_with_tools", client_host, question, _green)
 
-    question = payload.question.strip()
-    context_language = payload.context.language if payload.context else None
+    context = payload.get("context") if isinstance(payload.get("context"), dict) else None
+    context_language = context.get("language") if context else None
+    top_k = int(payload.get("top_k") or 8)
+    max_tool_rounds = payload.get("max_tool_rounds")
+    max_tool_rounds_int = int(max_tool_rounds) if max_tool_rounds is not None else 5
+    api_key = payload.get("api_key")
+    base_url = payload.get("base_url")
+    model_override = payload.get("model")
 
     def run():
         return _run_query_with_tools(
             question=question,
             context_language=context_language,
-            request_context=payload.context,
-            top_k=payload.top_k,
-            max_tool_rounds=payload.max_tool_rounds if payload.max_tool_rounds is not None else 5,
-            api_key=payload.api_key,
-            base_url=payload.base_url,
-            model_override=payload.model,
+            request_context=context,
+            top_k=top_k,
+            max_tool_rounds=max_tool_rounds_int,
+            api_key=api_key,
+            base_url=base_url,
+            model_override=model_override,
         )
 
     answer, snippets, tool_calls, context_usage = await asyncio.to_thread(run)
@@ -1315,7 +1332,7 @@ async def query_stream_with_tools(payload: QueryRequest, request: Request):
         for i in range(0, len(answer), chunk_size):
             yield answer[i : i + chunk_size]
         # Then send tool_calls so the client can run editor actions.
-        payload_list = [tc.model_dump() for tc in tool_calls]
+        payload_list = tool_calls
         yield _STREAM_TOOL_CALLS_PREFIX + json.dumps(payload_list) + "\n"
         yield "\n__USAGE__\n" + json.dumps(context_usage) + "\n"
 
@@ -1324,55 +1341,65 @@ async def query_stream_with_tools(payload: QueryRequest, request: Request):
     )
 
 
-# --- Godot Composer (fine-tuned model, tool_calls directly) ---
+# --- Unity Composer (fine-tuned model, tool_calls directly) ---
 
 
-@app.post("/composer/query", response_model=QueryResponseWithTools)
-async def composer_query(payload: QueryRequest, request: Request) -> QueryResponseWithTools:
+@app.post("/composer/query")
+async def composer_query(payload: Dict[str, Any], request: Request) -> Dict[str, Any]:
     """
-    Godot Composer: single-turn call to a fine-tuned model that outputs tool_calls
+    Unity Composer: single-turn call to a fine-tuned model that outputs tool_calls
     directly. Same request/response shape as /query so the plugin can switch by backend profile.
     """
     client_host = request.client.host if request.client else "unknown"
-    _log_rag_request("POST /composer/query", client_host, payload.question or "", _green)
-    question = payload.question.strip()
-    context_language = payload.context.language if payload.context else None
+    question = str(payload.get("question") or "").strip()
+    _log_rag_request("POST /composer/query", client_host, question, _green)
+    context = payload.get("context") if isinstance(payload.get("context"), dict) else None
+    context_language = context.get("language") if context else None
+    api_key = payload.get("api_key")
+    base_url = payload.get("base_url")
+    model_override = payload.get("model")
+    composer_mode = payload.get("composer_mode")
     answer, snippets, tool_calls, context_usage = _run_composer_query(
         question=question,
         context_language=context_language,
-        request_context=payload.context,
-        api_key=payload.api_key,
-        base_url=payload.base_url,
-        model_override=payload.model,
-        composer_mode=payload.composer_mode,
+        request_context=context,
+        api_key=api_key,
+        base_url=base_url,
+        model_override=model_override,
+        composer_mode=composer_mode,
     )
-    return QueryResponseWithTools(
-        answer=answer,
-        snippets=snippets,
-        tool_calls=tool_calls,
-        context_usage=context_usage,
-    )
+    return {
+        "answer": answer,
+        "snippets": snippets,
+        "tool_calls": tool_calls,
+        "context_usage": context_usage,
+    }
 
 
 @app.post("/composer/query_stream_with_tools")
-async def composer_query_stream_with_tools(payload: QueryRequest, request: Request):
+async def composer_query_stream_with_tools(payload: Dict[str, Any], request: Request):
     """
     Same as /composer/query but streams answer text then __TOOL_CALLS__ + JSON.
     """
     client_host = request.client.host if request.client else "unknown"
-    _log_rag_request("POST /composer/query_stream_with_tools", client_host, payload.question or "", _green)
-    question = payload.question.strip()
-    context_language = payload.context.language if payload.context else None
+    question = str(payload.get("question") or "").strip()
+    _log_rag_request("POST /composer/query_stream_with_tools", client_host, question, _green)
+    context = payload.get("context") if isinstance(payload.get("context"), dict) else None
+    context_language = context.get("language") if context else None
+    api_key = payload.get("api_key")
+    base_url = payload.get("base_url")
+    model_override = payload.get("model")
+    composer_mode = payload.get("composer_mode")
 
     def run():
         return _run_composer_query(
             question=question,
             context_language=context_language,
-            request_context=payload.context,
-            api_key=payload.api_key,
-            base_url=payload.base_url,
-            model_override=payload.model,
-            composer_mode=payload.composer_mode,
+            request_context=context,
+            api_key=api_key,
+            base_url=base_url,
+            model_override=model_override,
+            composer_mode=composer_mode,
         )
 
     answer, snippets, tool_calls, context_usage = await asyncio.to_thread(run)
@@ -1381,7 +1408,7 @@ async def composer_query_stream_with_tools(payload: QueryRequest, request: Reque
         chunk_size = 80
         for i in range(0, len(answer), chunk_size):
             yield answer[i : i + chunk_size]
-        payload_list = [tc.model_dump() for tc in tool_calls]
+        payload_list = tool_calls
         yield _STREAM_TOOL_CALLS_PREFIX + json.dumps(payload_list) + "\n"
         yield "\n__USAGE__\n" + json.dumps(context_usage) + "\n"
 
@@ -1391,24 +1418,29 @@ async def composer_query_stream_with_tools(payload: QueryRequest, request: Reque
 
 
 @app.post("/composer/query_stream")
-async def composer_query_stream(payload: QueryRequest, request: Request):
+async def composer_query_stream(payload: Dict[str, Any], request: Request):
     """
     Composer streaming (answer text only, no tool_calls suffix).
     """
     client_host = request.client.host if request.client else "unknown"
-    _log_rag_request("POST /composer/query_stream", client_host, payload.question or "", _dim)
-    question = payload.question.strip()
-    context_language = payload.context.language if payload.context else None
+    question = str(payload.get("question") or "").strip()
+    _log_rag_request("POST /composer/query_stream", client_host, question, _dim)
+    context = payload.get("context") if isinstance(payload.get("context"), dict) else None
+    context_language = context.get("language") if context else None
+    api_key = payload.get("api_key")
+    base_url = payload.get("base_url")
+    model_override = payload.get("model")
+    composer_mode = payload.get("composer_mode")
 
     def run():
         return _run_composer_query(
             question=question,
             context_language=context_language,
-            request_context=payload.context,
-            api_key=payload.api_key,
-            base_url=payload.base_url,
-            model_override=payload.model,
-            composer_mode=payload.composer_mode,
+            request_context=context,
+            api_key=api_key,
+            base_url=base_url,
+            model_override=model_override,
+            composer_mode=composer_mode,
         )
 
     answer, _, _, _ = await asyncio.to_thread(run)
@@ -1424,7 +1456,7 @@ async def composer_query_stream(payload: QueryRequest, request: Request):
 
 
 @app.post("/query_stream")
-async def query_stream(payload: QueryRequest, request: Request):
+async def query_stream(payload: Dict[str, Any], request: Request):
     """
     Streaming variant of /query.
 
@@ -1434,19 +1466,19 @@ async def query_stream(payload: QueryRequest, request: Request):
     - If no OpenAI client is configured, streams a single fallback answer.
     """
     client_host = request.client.host if request.client else "unknown"
-    _log_rag_request("POST /query_stream", client_host, payload.question or "", _dim)
-
-    question = payload.question.strip()
-    context_language = payload.context.language if payload.context else None
+    question = str(payload.get("question") or "").strip()
+    _log_rag_request("POST /query_stream", client_host, question, _dim)
+    context = payload.get("context") if isinstance(payload.get("context"), dict) else None
+    context_language = context.get("language") if context else None
 
     client, model = _openai_client_and_model(
-        api_key=payload.api_key,
-        base_url=payload.base_url,
-        model=payload.model,
+        api_key=payload.get("api_key"),
+        base_url=payload.get("base_url"),
+        model=payload.get("model"),
     )
 
     system_prompt = (
-        "You are a Godot 4.x development assistant. "
+        "You are a Unity 4.x development assistant. "
         "Answer the user's question. When writing code examples, use the user's preferred language if given. "
         "Show your reasoning: first output your thinking inside <think>...</think> tags (what you are considering, what you will do), then your final answer after the closing tag."
     )
@@ -1505,7 +1537,7 @@ async def query_stream(payload: QueryRequest, request: Request):
                 completion_tokens=int(completion_tokens),
                 context="query_stream",
             )
-            # Usage persistence is handled client-side in the Godot plugin.
+            # Usage persistence is handled client-side in the Unity plugin.
 
     return StreamingResponse(stream_iter(), media_type="text/plain; charset=utf-8")
 
