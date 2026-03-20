@@ -1,0 +1,17 @@
+fastapi>=0.128.0,<0.129.0
+uvicorn[standard]>=0.39.0,<1.0
+
+
+pydantic>=2.7,<3.0
+
+requests>=2.32,<3.0
+PyYAML==6.0.3
+
+# OpenAI-compatible LLM client and env loading
+# it just used 1.40.0 anyway after checking all of them??
+openai==1.40
+python-dotenv>=1.0,<2.0
+
+# Pydantic AI agent for OpenAI-compatible models
+pydantic-ai[openai]>=1.64,<2.0
+# pip install fastapi uvicorn[standard] requests PyYAML openai python-dotenv pydantic-ai[openai]

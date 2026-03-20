@@ -1,0 +1,16 @@
+{
+  "validator": "validate_composer_v3_dataset.py",
+  "contract_version": "v3.0.0",
+  "results": {
+    "ask": {
+      "mode": "ask",
+      "input_path": "C:\\Github\\godot-llm\\fine_tuning\\data\\composer_v3\\ask_strict.jsonl",
+      "total_records": 693,
+      "valid_records": 693,
+      "invalid_records": 0,
+      "error_counts": {},
+      "tool_frequency": {},
+      "sample_invalid_examples": []
+    }
+  }
+}

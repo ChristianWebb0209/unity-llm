@@ -1,0 +1,12 @@
+{
+  "read_records": 714,
+  "written_records": 693,
+  "rejected_records": 0,
+  "reject_reasons": {},
+  "inputs": [
+    "C:\\Github\\godot-llm\\fine_tuning\\data\\composer_v2\\ask_generated.jsonl",
+    "C:\\Github\\godot-llm\\fine_tuning\\data\\composer_v2\\train.jsonl",
+    "C:\\Github\\godot-llm\\fine_tuning\\data\\composer_v3\\ask_adversarial_contract.jsonl"
+  ],
+  "output": "C:\\Github\\godot-llm\\fine_tuning\\data\\composer_v3\\ask_strict.jsonl"
+}

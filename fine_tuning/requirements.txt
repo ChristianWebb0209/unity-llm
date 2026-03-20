@@ -1,0 +1,12 @@
+datasets==3.0.0
+transformers>=4.48.0,<4.49
+accelerate==0.34.2
+bitsandbytes==0.43.3
+peft==0.13.0
+trl==0.9.6
+sentencepiece
+einops
+requests
+beautifulsoup4
+python-dotenv
+

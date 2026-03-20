@@ -1,0 +1,24 @@
+{
+  "version": "v3.0.0",
+  "policy": {
+    "allow_aliases_in_final_dataset": false,
+    "fail_on_unmapped_unknown_tools": true
+  },
+  "aliases": {
+    "write_script": "write_file",
+    "read_file_content": "read_file",
+    "get_node_path": "get_node_tree",
+    "search_internet": "fetch_url",
+    "create_timer": null,
+    "create_signal": null,
+    "export_attribute": null,
+    "get_nodes_in_group": null,
+    "create_script_template": "create_script",
+    "filter_by_extension": "list_files",
+    "search_script_snippets": "search_files"
+  },
+  "notes": [
+    "Null values mean no safe canonical mapping exists and examples must be rejected or regenerated.",
+    "This file is for ingestion/canonicalization only and may not appear in final training records."
+  ]
+}

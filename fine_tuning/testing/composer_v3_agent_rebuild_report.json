@@ -1,0 +1,14 @@
+{
+  "read_records": 4136,
+  "written_records": 4049,
+  "rejected_records": 0,
+  "reject_reasons": {},
+  "remap_counts": {},
+  "inputs": [
+    "C:\\Github\\godot-llm\\fine_tuning\\data\\composer_v2\\agent_from_synthetic_v2_generated.jsonl",
+    "C:\\Github\\godot-llm\\fine_tuning\\data\\composer_v2\\agent_from_lint_repairs.jsonl",
+    "C:\\Github\\godot-llm\\fine_tuning\\data\\composer_v2\\agent_generated.jsonl",
+    "C:\\Github\\godot-llm\\fine_tuning\\data\\composer_v2\\train.jsonl"
+  ],
+  "output": "C:\\Github\\godot-llm\\fine_tuning\\data\\composer_v3\\agent_strict.jsonl"
+}
