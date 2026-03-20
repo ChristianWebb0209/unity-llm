@@ -139,7 +139,7 @@ def build_ordered_blocks(
 
     if current_scene_scripts and "current_scene_scripts" not in excluded:
         parts: List[str] = [
-            "Scripts attached to nodes in the currently open scene (user's project). Paths are res://.\n"
+            "Scripts attached to nodes in the currently open scene (user's project). Paths are Assets/.\n"
         ]
         for p, content in current_scene_scripts:
             parts.append(f"\n--- Script in current scene: {p} ---\n{content}")
@@ -154,7 +154,7 @@ def build_ordered_blocks(
         )
 
     if related_files and "related_files" not in excluded:
-        related_header = "Files in the user's project that are structurally related to the active file (res:// paths).\n"
+        related_header = "Files in the user's project that are structurally related to the active file (Assets/ paths).\n"
         related_parts = [related_header] + [
             f"\n--- Related file: {p} ---\n{content}" for p, content in related_files
         ]

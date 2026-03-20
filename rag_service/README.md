@@ -1,6 +1,6 @@
-## Godot RAG Service (Skeleton)
+## Unity RAG Service (Skeleton)
 
-This folder contains a minimal RAG backend for the Godot AI assistant. For now it
+This folder contains a minimal RAG backend for the Unity AI assistant. For now it
 only exposes a stubbed `/health` and `/query` endpoint, but the API surface is
 intended to remain stable as you plug in real retrieval and LLM calls.
 
@@ -41,5 +41,5 @@ Once running:
 ```
 
 will return a placeholder `answer` and one stub `snippet`. This is enough for the
-Godot plugin to integrate and verify the plumbing.
+Unity plugin to integrate and verify the plumbing.
 

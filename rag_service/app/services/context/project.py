@@ -9,13 +9,13 @@ from typing import Any, Dict, List, Optional, Tuple
 
 from ..repo_indexing import get_related_res_paths, index_repo
 
-_RE_RES_PATH = re.compile(r'res://[^"\'\s\)]+')
+_RE_RES_PATH = re.compile(r'Assets/[^"\'\s\)]+')
 
 
 def _safe_join(root_abs: str, res_path: str) -> str:
     rp = res_path.replace("\\", "/")
-    if rp.startswith("res://"):
-        rp = rp[len("res://"):]
+    if rp.startswith("Assets/"):
+        rp = rp[len("Assets/"):]
     return os.path.abspath(os.path.join(root_abs, rp))
 
 
@@ -33,14 +33,14 @@ def write_project_file(
     project_root_abs: str, res_path: str, content: str, overwrite: bool = False
 ) -> Dict[str, Any]:
     """
-    Create or overwrite a file under project_root_abs. res_path is e.g. res://scripts/foo.gd.
+    Create or overwrite a file under project_root_abs. res_path is e.g. Assets/scripts/foo.gd.
     Returns { "success": bool, "path": res_path, "content": new_content, "message": str }.
     """
     if not res_path or not res_path.strip():
         return {"success": False, "path": res_path, "content": "", "message": "path is required"}
     path_norm = res_path.strip().replace("\\", "/")
-    if not path_norm.startswith("res://"):
-        path_norm = "res://" + path_norm.lstrip("/")
+    if not path_norm.startswith("Assets/"):
+        path_norm = "Assets/" + path_norm.lstrip("/")
     abs_path = _safe_join(project_root_abs, path_norm)
     if not _ensure_under_root(project_root_abs, abs_path):
         return {"success": False, "path": path_norm, "content": "", "message": "path is outside project"}
@@ -123,8 +123,8 @@ def apply_project_patch(
     if not res_path or not res_path.strip():
         return {"success": False, "path": res_path, "content": "", "message": "path is required"}
     path_norm = res_path.strip().replace("\\", "/")
-    if not path_norm.startswith("res://"):
-        path_norm = "res://" + path_norm.lstrip("/")
+    if not path_norm.startswith("Assets/"):
+        path_norm = "Assets/" + path_norm.lstrip("/")
     abs_path = _safe_join(project_root_abs, path_norm)
     if not _ensure_under_root(project_root_abs, abs_path):
         return {"success": False, "path": path_norm, "content": "", "message": "path is outside project"}
@@ -156,8 +156,8 @@ def apply_project_patch_unified(
     if not res_path or not res_path.strip():
         return {"success": False, "path": res_path, "content": "", "message": "path is required"}
     path_norm = res_path.strip().replace("\\", "/")
-    if not path_norm.startswith("res://"):
-        path_norm = "res://" + path_norm.lstrip("/")
+    if not path_norm.startswith("Assets/"):
+        path_norm = "Assets/" + path_norm.lstrip("/")
     abs_path = _safe_join(project_root_abs, path_norm)
     if not _ensure_under_root(project_root_abs, abs_path):
         return {"success": False, "path": path_norm, "content": "", "message": "path is outside project"}
@@ -188,8 +188,8 @@ def append_project_file(project_root_abs: str, res_path: str, content: str) -> D
     if not res_path or not res_path.strip():
         return {"success": False, "path": res_path, "content": "", "message": "path is required"}
     path_norm = res_path.strip().replace("\\", "/")
-    if not path_norm.startswith("res://"):
-        path_norm = "res://" + path_norm.lstrip("/")
+    if not path_norm.startswith("Assets/"):
+        path_norm = "Assets/" + path_norm.lstrip("/")
     abs_path = _safe_join(project_root_abs, path_norm)
     if not _ensure_under_root(project_root_abs, abs_path):
         return {"success": False, "path": path_norm, "content": "", "message": "path is outside project"}
@@ -225,20 +225,20 @@ def read_project_file(
 
 def list_project_files(
     project_root_abs: str,
-    res_path: str = "res://",
+    res_path: str = "Assets/",
     recursive: bool = True,
     extensions: Optional[List[str]] = None,
     max_entries: int = 500,
 ) -> List[str]:
     """
     List file paths under project_root_abs under res_path.
-    Returns res://-prefixed paths.
+    Returns Assets/-prefixed paths.
     """
     if not project_root_abs or not os.path.isdir(project_root_abs):
         return []
     rp = res_path.replace("\\", "/").strip()
-    if rp.startswith("res://"):
-        rp = rp[len("res://"):].lstrip("/")
+    if rp.startswith("Assets/"):
+        rp = rp[len("Assets/"):].lstrip("/")
     root = os.path.abspath(os.path.join(project_root_abs, rp))
     if not root.startswith(os.path.abspath(project_root_abs)):
         return []
@@ -262,7 +262,7 @@ def list_project_files(
         for name in sorted(entries):
             if len(out) >= max_entries:
                 return
-            if name.startswith(".") and name == ".godot":
+            if name.startswith(".") and name == ".unity":
                 continue
             child_abs = os.path.join(dir_abs, name)
             child_res = (dir_res + "/" + name) if dir_res else name
@@ -274,7 +274,7 @@ def list_project_files(
                 ext = "." + (os.path.splitext(name)[1] or "").lower()
                 if ext not in exts:
                     continue
-            out.append("res://" + child_res.replace("\\", "/"))
+            out.append("Assets/" + child_res.replace("\\", "/"))
 
     start_res = rp.replace("\\", "/") if rp else ""
     if os.path.isdir(root):
@@ -284,20 +284,20 @@ def list_project_files(
 
 def list_project_directory(
     project_root_abs: str,
-    res_path: str = "res://",
+    res_path: str = "Assets/",
     recursive: bool = False,
     max_entries: int = 250,
     max_depth: int = 6,
 ) -> List[Dict[str, Any]]:
     """
     List directory entries (files and dirs) under project_root_abs under res_path.
-    Returns list of {"name": str, "path": str (res://), "is_dir": bool}.
+    Returns list of {"name": str, "path": str (Assets/), "is_dir": bool}.
     """
     if not project_root_abs or not os.path.isdir(project_root_abs):
         return []
     rp = res_path.replace("\\", "/").strip()
-    if rp.startswith("res://"):
-        rp = rp[len("res://"):].lstrip("/")
+    if rp.startswith("Assets/"):
+        rp = rp[len("Assets/"):].lstrip("/")
     root = os.path.abspath(os.path.join(project_root_abs, rp))
     if not root.startswith(os.path.abspath(project_root_abs)):
         return []
@@ -313,14 +313,14 @@ def list_project_directory(
         for name in sorted(entries):
             if len(out) >= max_entries:
                 return
-            if name.startswith(".") and name != ".godot":
+            if name.startswith(".") and name != ".unity":
                 continue
             child_abs = os.path.join(dir_abs, name)
             child_res = (dir_res + "/" + name) if dir_res else name
             is_dir = os.path.isdir(child_abs)
             out.append({
                 "name": name,
-                "path": "res://" + child_res.replace("\\", "/"),
+                "path": "Assets/" + child_res.replace("\\", "/"),
                 "is_dir": is_dir,
             })
             if is_dir and recursive and depth < max_depth:
@@ -335,19 +335,19 @@ def list_project_directory(
 def search_project_files(
     project_root_abs: str,
     query: str,
-    root_path: str = "res://",
+    root_path: str = "Assets/",
     extensions: Optional[List[str]] = None,
     max_matches: int = 50,
 ) -> List[Dict[str, Any]]:
     """
     Grep: find files under root_path whose content contains query.
-    Returns list of {"path": str (res://), "matches": list of {"line_no": int, "line": str}}.
+    Returns list of {"path": str (Assets/), "matches": list of {"line_no": int, "line": str}}.
     """
     if not project_root_abs or not os.path.isdir(project_root_abs) or not query:
         return []
     rp = root_path.replace("\\", "/").strip()
-    if rp.startswith("res://"):
-        rp = rp[len("res://"):].lstrip("/")
+    if rp.startswith("Assets/"):
+        rp = rp[len("Assets/"):].lstrip("/")
     root = os.path.abspath(os.path.join(project_root_abs, rp))
     if not root.startswith(os.path.abspath(project_root_abs)):
         return []
@@ -377,7 +377,7 @@ def search_project_files(
                 if len(matches) >= 10:
                     break
         if matches:
-            out.append({"path": "res://" + file_res.replace("\\", "/"), "matches": matches})
+            out.append({"path": "Assets/" + file_res.replace("\\", "/"), "matches": matches})
 
     def walk(dir_abs: str, dir_res: str) -> None:
         if len(out) >= max_matches:
@@ -389,7 +389,7 @@ def search_project_files(
         for name in sorted(entries):
             if len(out) >= max_matches:
                 return
-            if name.startswith(".") and name == ".godot":
+            if name.startswith(".") and name == ".unity":
                 continue
             child_abs = os.path.join(dir_abs, name)
             child_res = (dir_res + "/" + name) if dir_res else name
@@ -414,20 +414,20 @@ def search_project_files(
 def grep_project_files(
     project_root_abs: str,
     pattern: str,
-    root_path: str = "res://",
+    root_path: str = "Assets/",
     extensions: Optional[List[str]] = None,
     max_matches: int = 100,
     use_regex: bool = True,
 ) -> List[Dict[str, Any]]:
     """
     Search project files for a pattern (regex or literal). Returns list of
-    {"path": res://, "line_no": int, "line": str} per match.
+    {"path": Assets/, "line_no": int, "line": str} per match.
     """
     if not project_root_abs or not os.path.isdir(project_root_abs) or not pattern:
         return []
     rp = root_path.replace("\\", "/").strip()
-    if rp.startswith("res://"):
-        rp = rp[len("res://"):].lstrip("/")
+    if rp.startswith("Assets/"):
+        rp = rp[len("Assets/"):].lstrip("/")
     root = os.path.abspath(os.path.join(project_root_abs, rp))
     if not root.startswith(os.path.abspath(project_root_abs)):
         return []
@@ -458,7 +458,7 @@ def grep_project_files(
                 return
             if re_pat.search(line):
                 out.append({
-                    "path": "res://" + file_res.replace("\\", "/"),
+                    "path": "Assets/" + file_res.replace("\\", "/"),
                     "line_no": i,
                     "line": line.rstrip("\n\r"),
                 })
@@ -473,7 +473,7 @@ def grep_project_files(
         for name in sorted(entries):
             if len(out) >= max_matches:
                 return
-            if name.startswith(".") and name == ".godot":
+            if name.startswith(".") and name == ".unity":
                 continue
             child_abs = os.path.join(dir_abs, name)
             child_res = (dir_res + "/" + name) if dir_res else name
@@ -492,14 +492,14 @@ def grep_project_files(
     return out
 
 
-def read_project_godot_ini(project_root_abs: str) -> Dict[str, Dict[str, str]]:
+def read_project_unity_ini(project_root_abs: str) -> Dict[str, Dict[str, str]]:
     """
-    Read project.godot and return a dict of section -> { key: value }.
+    Read project.unity and return a dict of section -> { key: value }.
     Used for [autoload], [input], and other sections.
     """
     if not project_root_abs or not os.path.isdir(project_root_abs):
         return {}
-    path = os.path.join(project_root_abs, "project.godot")
+    path = os.path.join(project_root_abs, "project.unity")
     if not os.path.isfile(path):
         return {}
     result: Dict[str, Dict[str, str]] = {}
@@ -527,7 +527,7 @@ def read_project_godot_ini(project_root_abs: str) -> Dict[str, Dict[str, str]]:
 
 def extract_structural_deps(text: str) -> List[str]:
     """
-    Heuristic dependency extraction: res:// paths from preload/load/extends/ResourceLoader.
+    Heuristic dependency extraction: Assets/ paths from preload/load/extends/ResourceLoader.
     """
     if not text:
         return []
@@ -553,7 +553,7 @@ def build_related_files_context(
     One-hop structural proximity from heuristics.
 
     NOTE: The plugin now provides one-hop `related_res_paths` client-side.
-    This function remains as a stateless fallback (no SQLite indexing).
+    This function remains as a stateless fallback (no server-side database indexing).
     Returns list of (res_path, content).
     """
     deps = extract_structural_deps(active_file_text)

@@ -2,19 +2,19 @@
 
 ## Target product shape
 
-- **Godot plugin is the product**: user installs plugin, pastes a model provider key (BYOK), chooses a model, and uses the assistant.
+- **Unity plugin is the product**: user installs plugin, pastes a model provider key (BYOK), chooses a model, and uses the assistant.
 - **No user accounts**: no auth, no per-user database, no cloud sync.
 - **Local-first state**: chat history + checkpoints live on the user’s machine.
 - **Hosted service is “stateless” w.r.t. user data**: it can run retrieval + prompt assembly + LLM calls, but does not persist user projects or chats.
 
 ## Data boundaries (what lives where)
 
-### Client (Godot plugin)
+### Client (Unity plugin)
 
 Persist locally (OS appdata via `user://` and/or config paths):
 
-- **Settings** (already): `godot_plugin/addons/godot_ai_assistant/settings.gd` persists to OS appdata config (`ConfigFile`).
-- **Edit timeline** (already): `user://godot_ai_assistant_edits.json` in `godot_plugin/addons/godot_ai_assistant/ai_edit_store.gd`.
+- **Settings** (already): `unity_plugin/addons/unity_ai_assistant/settings.gd` persists to OS appdata config (`ConfigFile`).
+- **Edit timeline** (already): `user://unity_ai_assistant_edits.json` in `unity_plugin/addons/unity_ai_assistant/ai_edit_store.gd`.
 - **Chats** (planned): persist all chats + per-turn request/response payloads locally.
 - **Checkpoints** (planned): diff-first checkpoints; when git exists, store `base_commit + patch` and fall back to file snapshots if needed.
 
@@ -28,7 +28,7 @@ Two deployment modes:
 
 1) **Hosted, stateless wrt user data** (recommended for “install plugin + paste key”):
    - Stores only its own service data (logs/metrics if enabled).
-   - Retrieval corpus is **static** (Godot docs / curated examples / tool schema), not user projects.
+   - Retrieval corpus is **static** (Unity docs / curated examples / tool schema), not user projects.
    - Does not store user BYOK keys (keys are used per request only).
 
 2) **Local backend** (dev/self-host):
@@ -100,7 +100,7 @@ Operationally:
 
 ### Phase 1 — ship local chat storage
 
-- Implement chat store under `user://godot_ai_assistant/chats/`:
+- Implement chat store under `user://unity_ai_assistant/chats/`:
   - `index.json` + per-chat metadata + append-only turn files.
 - Wire persistence into the chat store/controller layer (not UI).
 - Add Chat History UI (separate from server-backed Edit History).

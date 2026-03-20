@@ -1,9 +1,9 @@
-# Context Vision (Godot Agent Working Set)
+# Context Vision (Unity Agent Working Set)
 
 ## Core Idea
 Maintain a continuously updated **working set** (small, relevance-scored context window) derived from:
 
-1. **User/editor action stream** (what the user is currently doing in Godot)
+1. **User/editor action stream** (what the user is currently doing in Unity)
 2. **Agent/tool action stream** (what the agent just changed and what failed)
 
 Then compose the prompt from the working set with strict **budgeting + eviction**.
@@ -116,7 +116,7 @@ ToolRunner --> AgentActionListener : lint failures + outputs
 
 ```mermaid
 flowchart TD
-  A[Godot Editor: user events] --> B[EditorActionListener]
+  A[Unity Editor: user events] --> B[EditorActionListener]
   C[Agent/tool execution events] --> D[AgentActionListener]
 
   B --> E[ContextIndex (working candidates)]
@@ -191,8 +191,8 @@ OpenViking is complementary:
 
 ---
 
-## Why this matters for a Godot agent (fundamentals)
-In Godot, context is not just "which files exist":
+## Why this matters for a Unity agent (fundamentals)
+In Unity, context is not just "which files exist":
 - The model needs a representation of the current engine world state (scene + attached scripts + selection + relevant wiring).
 - Tool execution changes the world; those changes must become context immediately.
 - Context must be evicted/decayed so the model does not "fight" stale assumptions.

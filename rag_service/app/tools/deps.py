@@ -1,5 +1,5 @@
 """
-Request-scoped dependencies for the Pydantic AI Godot agent.
+Request-scoped dependencies for the Pydantic AI Unity agent.
 Populated in main from QueryContext before calling the agent; tools and execute_tool use these.
 """
 from dataclasses import dataclass, field
@@ -7,7 +7,7 @@ from typing import Any, Dict, Optional
 
 
 @dataclass
-class GodotQueryDeps:
+class UnityQueryDeps:
     """
     Dependencies passed to the agent and tools for each request.
     Mirrors the context extracted from QueryContext in main.py for the tool loop.

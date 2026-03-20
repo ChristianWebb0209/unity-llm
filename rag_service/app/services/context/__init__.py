@@ -32,7 +32,7 @@ from .project import (
     list_project_directory,
     list_project_files,
     read_project_file,
-    read_project_godot_ini,
+    read_project_unity_ini,
     search_project_files,
     write_project_file,
 )
@@ -71,7 +71,7 @@ __all__ = [
     "list_project_files",
     "parse_tscn_script_paths",
     "read_project_file",
-    "read_project_godot_ini",
+    "read_project_unity_ini",
     "trim_text_to_tokens",
     "write_project_file",
     "grep_project_files",

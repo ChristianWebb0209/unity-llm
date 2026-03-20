@@ -4,7 +4,7 @@ from typing import Any, Callable, Dict, List, Optional
 from ..services.asset_library import search_asset_library
 from ..services.context import (
     grep_project_files,
-    read_project_godot_ini,
+    read_project_unity_ini,
 )
 
 
@@ -18,10 +18,10 @@ class ToolDef:
     handler: Callable[[Dict[str, Any]], Any]
 
 
-# --- Editor tools: executed on the Godot client; backend returns payload only ---
+# --- Editor tools: executed on the Unity client; backend returns payload only ---
 
 def _editor_payload(name: str, **kwargs: Any) -> Dict[str, Any]:
-    """Return a payload that the Godot plugin will execute locally."""
+    """Return a payload that the Unity plugin will execute locally."""
     out: Dict[str, Any] = {"execute_on_client": True, "action": name}
     out.update(kwargs)
     return out
@@ -92,8 +92,8 @@ def _normalize_scene_path(path: str) -> str:
     p = (path or "").strip()
     if not p:
         return p
-    if not p.startswith("res://"):
-        p = "res://" + p
+    if not p.startswith("Assets/"):
+        p = "Assets/" + p
     return p
 
 
@@ -154,11 +154,11 @@ def _tool_modify_attribute(args: Dict[str, Any]) -> Dict[str, Any]:
         path = str(args.get("path") or "").strip()
         if not path:
             return {
-                "error": "For target_type=import, path is required (e.g. res://icon.svg)",
+                "error": "For target_type=import, path is required (e.g. Assets/icon.svg)",
                 "execute_on_client": False,
             }
-        if not path.startswith("res://"):
-            path = "res://" + path
+        if not path.startswith("Assets/"):
+            path = "Assets/" + path
         return _editor_payload(
             "modify_attribute",
             target_type="import",
@@ -187,7 +187,7 @@ def _tool_delete_file(args: Dict[str, Any]) -> Dict[str, Any]:
 
 
 def _tool_lint_file(args: Dict[str, Any]) -> Dict[str, Any]:
-    """Run the Godot linter on a project file. Executed on the client; result is shown in the editor."""
+    """Run the Unity linter on a project file. Executed on the client; result is shown in the editor."""
     path = (args.get("path") or "").strip()
     if not path:
         return {"error": "path is required", "execute_on_client": False}
@@ -195,7 +195,7 @@ def _tool_lint_file(args: Dict[str, Any]) -> Dict[str, Any]:
 
 
 def _tool_list_directory(args: Dict[str, Any]) -> Dict[str, Any]:
-    path = (args.get("path") or "res://").strip() or "res://"
+    path = (args.get("path") or "Assets/").strip() or "Assets/"
     recursive = bool(args.get("recursive", False))
     max_entries = int(args.get("max_entries", 250))
     max_depth = int(args.get("max_depth", 6))
@@ -218,7 +218,7 @@ def _tool_list_directory(args: Dict[str, Any]) -> Dict[str, Any]:
 
 def _tool_search_files(args: Dict[str, Any]) -> Dict[str, Any]:
     query = str(args.get("query") or "").strip()
-    root_path = str(args.get("root_path") or "res://").strip() or "res://"
+    root_path = str(args.get("root_path") or "Assets/").strip() or "Assets/"
     extensions = args.get("extensions") or []
     max_matches = int(args.get("max_matches", 50))
     if not query:
@@ -239,8 +239,8 @@ def _tool_search_files(args: Dict[str, Any]) -> Dict[str, Any]:
 
 
 def _tool_list_files(args: Dict[str, Any]) -> Dict[str, Any]:
-    """List file paths under res:// by optional extension(s), no content search (glob-style)."""
-    path = str(args.get("path") or "res://").strip() or "res://"
+    """List file paths under Assets/ by optional extension(s), no content search (glob-style)."""
+    path = str(args.get("path") or "Assets/").strip() or "Assets/"
     recursive = bool(args.get("recursive", True))
     extensions = args.get("extensions") or []
     max_entries = int(args.get("max_entries", 500))
@@ -260,7 +260,7 @@ def _tool_list_files(args: Dict[str, Any]) -> Dict[str, Any]:
 
 
 def _tool_read_import_options(args: Dict[str, Any]) -> Dict[str, Any]:
-    """Read the .import file for a resource (e.g. res://icon.svg). Returns full content or params section."""
+    """Read the .import file for a resource (e.g. Assets/icon.svg). Returns full content or params section."""
     path = str(args.get("path") or "").strip()
     if not path:
         return {"error": "path is required", "execute_on_client": False}
@@ -270,7 +270,7 @@ def _tool_read_import_options(args: Dict[str, Any]) -> Dict[str, Any]:
 def _tool_project_structure(args: Dict[str, Any]) -> Dict[str, Any]:
     """Server-only: list indexed file paths under a prefix. Requires project_root_abs from context."""
     return {
-        "error": "Project structure is available when the editor has a project open (project_root_abs sent). Open a Godot project and try again.",
+        "error": "Project structure is available when the editor has a project open (project_root_abs sent). Open a Unity project and try again.",
         "execute_on_client": False,
     }
 
@@ -278,7 +278,7 @@ def _tool_project_structure(args: Dict[str, Any]) -> Dict[str, Any]:
 def _tool_find_scripts_by_extends(args: Dict[str, Any]) -> Dict[str, Any]:
     """Server-only: find scripts that extend a class. Requires project_root_abs from context."""
     return {
-        "error": "Find scripts by extends is available when the editor has a project open. Open a Godot project and try again.",
+        "error": "Find scripts by extends is available when the editor has a project open. Open a Unity project and try again.",
         "execute_on_client": False,
     }
 
@@ -286,7 +286,7 @@ def _tool_find_scripts_by_extends(args: Dict[str, Any]) -> Dict[str, Any]:
 def _tool_find_references_to(args: Dict[str, Any]) -> Dict[str, Any]:
     """Server-only: find files that reference a given path. Requires project_root_abs from context."""
     return {
-        "error": "Find references is available when the editor has a project open. Open a Godot project and try again.",
+        "error": "Find references is available when the editor has a project open. Open a Unity project and try again.",
         "execute_on_client": False,
     }
 
@@ -295,13 +295,13 @@ def _tool_find_references_to(args: Dict[str, Any]) -> Dict[str, Any]:
 
 def _tool_get_recent_changes(args: Dict[str, Any]) -> Dict[str, Any]:
     """
-    Deprecated: backend edit history was moved to the Godot plugin.
+    Deprecated: backend edit history was moved to the Unity plugin.
 
-    The plugin now persists edit timeline + revert locally under `user://` via GodotAIEditStore.
+    The plugin now persists edit timeline + revert locally under `user://` via UnityAIEditStore.
     """
     return {
         "success": False,
-        "message": "deprecated: edit history is local-only in the Godot plugin (no backend DB).",
+        "message": "deprecated: edit history is local-only in the Unity plugin.",
         "events": [],
     }
 
@@ -309,7 +309,7 @@ def _tool_get_recent_changes(args: Dict[str, Any]) -> Dict[str, Any]:
 def _tool_grep_search(args: Dict[str, Any]) -> Dict[str, Any]:
     """Regex or exact pattern search in project files. Server runs when project open; else client."""
     pattern = str(args.get("pattern") or args.get("query") or "").strip()
-    root_path = str(args.get("root_path") or "res://").strip() or "res://"
+    root_path = str(args.get("root_path") or "Assets/").strip() or "Assets/"
     extensions = args.get("extensions") or []
     max_matches = min(500, max(1, int(args.get("max_matches", 100))))
     use_regex = bool(args.get("use_regex", True))
@@ -326,24 +326,19 @@ def _tool_grep_search(args: Dict[str, Any]) -> Dict[str, Any]:
 
 
 def _tool_fetch_url(args: Dict[str, Any]) -> Dict[str, Any]:
-    """Server-only: HTTP GET a URL and return the response text (e.g. docs, web search result)."""
+    """Local-only mode: external URL fetching is intentionally disabled."""
     url = str(args.get("url") or "").strip()
-    if not url or not url.startswith(("http://", "https://")):
-        return {"success": False, "message": "url is required and must be http(s)://"}
-    try:
-        import requests
-        r = requests.get(url, timeout=30, headers={"User-Agent": "Godot-AI-Assistant/1.0"})
-        r.raise_for_status()
-        text = r.text
-        if len(text) > 100_000:
-            text = text[:100_000] + "\n\n[... truncated ...]"
-        return {"success": True, "url": url, "content": text, "message": "Fetched %d chars." % len(text)}
-    except Exception as e:
-        return {"success": False, "url": url, "message": "Fetch failed: %s" % (e,)}
+    if not url:
+        return {"success": False, "message": "url is required"}
+    return {
+        "success": False,
+        "url": url,
+        "message": "disabled_in_local_mode: external URL fetching is disabled; rely on local files and editor context.",
+    }
 
 
 def _tool_run_terminal_command(args: Dict[str, Any]) -> Dict[str, Any]:
-    """Run a shell command; executed on the Godot client. Captures stdout/stderr and exit code."""
+    """Run a shell command; executed on the Unity client. Captures stdout/stderr and exit code."""
     command = args.get("command") or args.get("cmd")
     if isinstance(command, list):
         command = " ".join(str(c) for c in command)
@@ -354,26 +349,26 @@ def _tool_run_terminal_command(args: Dict[str, Any]) -> Dict[str, Any]:
     return _editor_payload("run_terminal_command", command=command, timeout_seconds=timeout_sec)
 
 
-def _tool_run_godot_headless(args: Dict[str, Any]) -> Dict[str, Any]:
-    """Run Godot headlessly (e.g. --path <dir> --script <path>). Executed on client; captures stdout/stderr."""
+def _tool_run_unity_headless(args: Dict[str, Any]) -> Dict[str, Any]:
+    """Run Unity headlessly (e.g. --path <dir> --script <path>). Executed on client; captures stdout/stderr."""
     scene_or_script = str(args.get("scene_path") or args.get("script_path") or "").strip()
     if not scene_or_script:
         return {"error": "scene_path or script_path is required", "execute_on_client": False}
     timeout_sec = min(120, max(1, int(args.get("timeout_seconds", 30))))
     return _editor_payload(
-        "run_godot_headless",
+        "run_unity_headless",
         scene_path=scene_or_script,
         timeout_seconds=timeout_sec,
     )
 
 
 def _tool_run_scene(args: Dict[str, Any]) -> Dict[str, Any]:
-    """Run a scene headlessly and capture output. Executed on Godot client."""
+    """Run a scene headlessly and capture output. Executed on Unity client."""
     scene_path = str(args.get("scene_path") or "").strip()
     if not scene_path:
-        return {"error": "scene_path is required (e.g. res://main.tscn)", "execute_on_client": False}
-    if not scene_path.startswith("res://"):
-        scene_path = "res://" + scene_path
+        return {"error": "scene_path is required (e.g. Assets/main.tscn)", "execute_on_client": False}
+    if not scene_path.startswith("Assets/"):
+        scene_path = "Assets/" + scene_path
     timeout_sec = min(120, max(1, int(args.get("timeout_seconds", 30))))
     return _editor_payload("run_scene", scene_path=scene_path, timeout_seconds=timeout_sec)
 
@@ -422,29 +417,29 @@ def _tool_get_export_vars(args: Dict[str, Any]) -> Dict[str, Any]:
 
 
 def _tool_search_asset_library(args: Dict[str, Any]) -> Dict[str, Any]:
-    """Server-only: search Godot Asset Library for addons/plugins."""
+    """Server-only: search Unity Asset Library for addons/plugins."""
     filter_text = str(args.get("filter") or args.get("query") or "").strip()
-    godot_version = str(args.get("godot_version") or "4.2").strip()
+    unity_version = str(args.get("unity_version") or "4.2").strip()
     max_results = min(50, max(1, int(args.get("max_results", 20))))
     return search_asset_library(
         filter_text=filter_text or "plugin",
-        godot_version=godot_version,
+        unity_version=unity_version,
         max_results=max_results,
     )
 
 
 def _tool_get_project_settings(args: Dict[str, Any]) -> Dict[str, Any]:
-    """Return project.godot settings. Server when project open; else client."""
+    """Return project.unity settings. Server when project open; else client."""
     return _editor_payload("get_project_settings")
 
 
 def _tool_get_autoloads(args: Dict[str, Any]) -> Dict[str, Any]:
-    """List autoloaded singletons from project.godot. Server when project open; else client."""
+    """List autoloaded singletons from project.unity. Server when project open; else client."""
     return _editor_payload("get_autoloads")
 
 
 def _tool_get_input_map(args: Dict[str, Any]) -> Dict[str, Any]:
-    """Read input map (action names and bound keys) from project.godot. Server when project open; else client."""
+    """Read input map (action names and bound keys) from project.unity. Server when project open; else client."""
     return _editor_payload("get_input_map")
 
 
@@ -521,7 +516,7 @@ def get_registered_tools() -> List[ToolDef]:
     This is the single source of truth for backend-side tools for now.
     """
     return [
-        # --- Editor tools (executed on Godot client) ---
+        # --- Editor tools (executed on Unity client) ---
         ToolDef(
             name="create_file",
             description=(
@@ -531,7 +526,7 @@ def get_registered_tools() -> List[ToolDef]:
             parameters={
                 "type": "object",
                 "properties": {
-                    "path": {"type": "string", "description": "Project path, e.g. res://scripts/foo.gd"},
+                    "path": {"type": "string", "description": "Project path, e.g. Assets/scripts/foo.gd"},
                     "content": {"type": "string", "description": "Optional initial content; omit or empty for create-only.", "default": ""},
                     "overwrite": {"type": "boolean", "description": "Overwrite if exists.", "default": False},
                 },
@@ -549,7 +544,7 @@ def get_registered_tools() -> List[ToolDef]:
             parameters={
                 "type": "object",
                 "properties": {
-                    "path": {"type": "string", "description": "Project path starting with res:// (e.g., res://scripts/player.gd)."},
+                    "path": {"type": "string", "description": "Project path starting with Assets/ (e.g., Assets/scripts/player.gd)."},
                     "content": {"type": "string", "description": "Full file content to write."},
                 },
                 "required": ["path", "content"],
@@ -562,7 +557,7 @@ def get_registered_tools() -> List[ToolDef]:
             parameters={
                 "type": "object",
                 "properties": {
-                    "path": {"type": "string", "description": "Project path starting with res:// (e.g., res://scripts/player.gd)."},
+                    "path": {"type": "string", "description": "Project path starting with Assets/ (e.g., Assets/scripts/player.gd)."},
                     "content": {"type": "string", "description": "Content to append to the file."},
                 },
                 "required": ["path", "content"],
@@ -579,7 +574,7 @@ def get_registered_tools() -> List[ToolDef]:
             parameters={
                 "type": "object",
                 "properties": {
-                    "path": {"type": "string", "description": "Project path starting with res:// (e.g., res://scripts/player.gd)."},
+                    "path": {"type": "string", "description": "Project path starting with Assets/ (e.g., Assets/scripts/player.gd)."},
                     "old_string": {"type": "string", "description": "Exact text to find and replace (omit if using diff)."},
                     "new_string": {"type": "string", "description": "Replacement text (omit if using diff)."},
                     "diff": {"type": "string", "description": "Optional unified diff string instead of old_string/new_string."},
@@ -598,7 +593,7 @@ def get_registered_tools() -> List[ToolDef]:
             parameters={
                 "type": "object",
                 "properties": {
-                    "path": {"type": "string", "description": "Project path starting with res:// (e.g., res://scripts/player.gd)."},
+                    "path": {"type": "string", "description": "Project path starting with Assets/ (e.g., Assets/scripts/player.gd)."},
                     "language": {"type": "string", "description": "gdscript or csharp", "enum": ["gdscript", "csharp"], "default": "gdscript"},
                     "extends_class": {"type": "string", "description": "Base class, e.g. Node, CharacterBody2D (ignored if template is set).", "default": "Node"},
                     "initial_content": {"type": "string", "description": "Optional body content; with template this is the unique logic only.", "default": ""},
@@ -611,7 +606,7 @@ def get_registered_tools() -> List[ToolDef]:
         ToolDef(
             name="create_node",
             description=(
-                "Add a new node to a scene. Executes in the Godot editor: opens the scene, adds the node, saves. "
+                "Add a new node to a scene. Executes in the Unity editor: opens the scene, adds the node, saves. "
                 "ALWAYS attach to the current scene: omit scene_path (or use 'current'). parent_path defaults to /root. "
                 "Match the scene dimension: in a 2D scene use Node2D, CharacterBody2D, Sprite2D, CollisionShape2D, etc.; "
                 "in a 3D scene use Node3D, CharacterBody3D, MeshInstance3D, etc. Do NOT use 3D types in a 2D scene or vice versa."
@@ -619,9 +614,9 @@ def get_registered_tools() -> List[ToolDef]:
             parameters={
                 "type": "object",
                 "properties": {
-                    "scene_path": {"type": "string", "description": "Optional. res:// path to scene, e.g. res://main.tscn (or use 'current' for the open scene)."},
+                    "scene_path": {"type": "string", "description": "Optional. Assets/ path to scene, e.g. Assets/main.tscn (or use 'current' for the open scene)."},
                     "parent_path": {"type": "string", "description": "Node path of parent in scene; default /root (scene root).", "default": "/root"},
-                    "node_type": {"type": "string", "description": "Built-in Godot class only: Node, Node2D, Button, Label, CharacterBody2D, Sprite2D, etc."},
+                    "node_type": {"type": "string", "description": "Built-in Unity class only: Node, Node2D, Button, Label, CharacterBody2D, Sprite2D, etc."},
                     "node_name": {"type": "string", "description": "Optional name for the new node."},
                 },
                 "required": ["node_type"],
@@ -642,9 +637,9 @@ def get_registered_tools() -> List[ToolDef]:
                     "target_type": {"type": "string", "enum": ["node", "import"], "description": "Either 'node' or 'import'."},
                     "attribute": {"type": "string", "description": "Property/key name (e.g. position, compress, text)."},
                     "value": {"description": "New value (number, string, bool, or [x,y] for vectors)."},
-                    "scene_path": {"type": "string", "description": "Required if target_type=node. Scene file path starting with res:// (e.g., res://main.tscn)."},
+                    "scene_path": {"type": "string", "description": "Required if target_type=node. Scene file path starting with Assets/ (e.g., Assets/main.tscn)."},
                     "node_path": {"type": "string", "description": "Required if target_type=node. Path to the node inside the scene, e.g. /root/Sprite"},
-                    "path": {"type": "string", "description": "Required if target_type=import. Resource path, e.g. res://icon.svg"},
+                    "path": {"type": "string", "description": "Required if target_type=import. Resource path, e.g. Assets/icon.svg"},
                 },
                 "required": ["target_type", "attribute", "value"],
             },
@@ -662,7 +657,7 @@ def get_registered_tools() -> List[ToolDef]:
                 "properties": {
                     "path": {
                         "type": "string",
-                        "description": "Project path starting with res:// (e.g., res://scripts/player.gd).",
+                        "description": "Project path starting with Assets/ (e.g., Assets/scripts/player.gd).",
                     },
                 },
                 "required": ["path"],
@@ -675,7 +670,7 @@ def get_registered_tools() -> List[ToolDef]:
             parameters={
                 "type": "object",
                 "properties": {
-                    "path": {"type": "string", "description": "Project path starting with res:// (e.g., res://scripts/old.gd)."},
+                    "path": {"type": "string", "description": "Project path starting with Assets/ (e.g., Assets/scripts/old.gd)."},
                 },
                 "required": ["path"],
             },
@@ -683,11 +678,11 @@ def get_registered_tools() -> List[ToolDef]:
         ),
         ToolDef(
             name="list_directory",
-            description="List files and folders in a directory under res://.",
+            description="List files and folders in a directory under Assets/.",
             parameters={
                 "type": "object",
                 "properties": {
-                    "path": {"type": "string", "description": "Directory path, e.g. res:// or res://scripts", "default": "res://"},
+                    "path": {"type": "string", "description": "Directory path, e.g. Assets/ or Assets/scripts", "default": "Assets/"},
                     "recursive": {"type": "boolean", "description": "List recursively.", "default": False},
                     "max_entries": {"type": "integer", "description": "Max number of returned entries.", "default": 250, "minimum": 1, "maximum": 2000},
                     "max_depth": {"type": "integer", "description": "Max recursion depth if recursive.", "default": 6, "minimum": 0, "maximum": 20},
@@ -697,12 +692,12 @@ def get_registered_tools() -> List[ToolDef]:
         ),
         ToolDef(
             name="search_files",
-            description="Search for a text query inside project files under res:// (grep: finds files containing the text).",
+            description="Search for a text query inside project files under Assets/ (grep: finds files containing the text).",
             parameters={
                 "type": "object",
                 "properties": {
                     "query": {"type": "string", "description": "Text to search for inside files."},
-                    "root_path": {"type": "string", "description": "Directory to search under.", "default": "res://"},
+                    "root_path": {"type": "string", "description": "Directory to search under.", "default": "Assets/"},
                     "extensions": {"type": "array", "items": {"type": "string"}, "description": "Optional extension filters like ['.gd','.tscn'].", "default": []},
                     "max_matches": {"type": "integer", "description": "Max number of file matches.", "default": 50, "minimum": 1, "maximum": 500},
                 },
@@ -713,13 +708,13 @@ def get_registered_tools() -> List[ToolDef]:
         ToolDef(
             name="list_files",
             description=(
-                "List file paths under res:// by optional extension(s), without searching file contents. "
+                "List file paths under Assets/ by optional extension(s), without searching file contents. "
                 "Use this to find all files of a type (e.g. all .svg, .png, .tscn). Returns paths only."
             ),
             parameters={
                 "type": "object",
                 "properties": {
-                    "path": {"type": "string", "description": "Directory to list, e.g. res:// or res://assets", "default": "res://"},
+                    "path": {"type": "string", "description": "Directory to list, e.g. Assets/ or Assets/assets", "default": "Assets/"},
                     "recursive": {"type": "boolean", "description": "List recursively.", "default": True},
                     "extensions": {"type": "array", "items": {"type": "string"}, "description": "Filter by extension, e.g. ['.svg'], ['.png','.jpg']. Omit for all files.", "default": []},
                     "max_entries": {"type": "integer", "description": "Max paths to return.", "default": 500, "minimum": 1, "maximum": 2000},
@@ -730,13 +725,13 @@ def get_registered_tools() -> List[ToolDef]:
         ToolDef(
             name="read_import_options",
             description=(
-                "Read the .import file for a resource (e.g. res://icon.svg). Returns the file content so you can see current import options. "
-                "Import options control how Godot imports assets (e.g. SVG compression, texture mipmaps)."
+                "Read the .import file for a resource (e.g. Assets/icon.svg). Returns the file content so you can see current import options. "
+                "Import options control how Unity imports assets (e.g. SVG compression, texture mipmaps)."
             ),
             parameters={
                 "type": "object",
                 "properties": {
-                    "path": {"type": "string", "description": "Resource path, e.g. res://icon.svg (the .import file read is path.import)."},
+                    "path": {"type": "string", "description": "Resource path, e.g. Assets/icon.svg (the .import file read is path.import)."},
                 },
                 "required": ["path"],
             },
@@ -745,13 +740,13 @@ def get_registered_tools() -> List[ToolDef]:
         ToolDef(
             name="lint_file",
             description=(
-                "Run the Godot script linter on a project file (e.g. res://player.gd). "
+                "Run the Unity script linter on a project file (e.g. Assets/player.gd). "
                 "Use when the user asks to lint a file or check for errors. The linter output is shown in the editor."
             ),
             parameters={
                 "type": "object",
                 "properties": {
-                    "path": {"type": "string", "description": "Project path to the script, e.g. res://scripts/foo.gd"},
+                    "path": {"type": "string", "description": "Project path to the script, e.g. Assets/scripts/foo.gd"},
                 },
                 "required": ["path"],
             },
@@ -766,7 +761,7 @@ def get_registered_tools() -> List[ToolDef]:
             parameters={
                 "type": "object",
                 "properties": {
-                    "prefix": {"type": "string", "description": "res:// prefix, e.g. res:// or res://scripts", "default": "res://"},
+                    "prefix": {"type": "string", "description": "Assets/ prefix, e.g. Assets/ or Assets/scripts", "default": "Assets/"},
                     "max_paths": {"type": "integer", "description": "Max paths to return.", "default": 300, "minimum": 1, "maximum": 1000},
                     "max_depth": {"type": "integer", "description": "Max path depth (segment count). Omit for no limit.", "minimum": 1, "maximum": 10},
                 },
@@ -792,22 +787,22 @@ def get_registered_tools() -> List[ToolDef]:
             name="find_references_to",
             description=(
                 "Find files that reference a given path (e.g. a scene or script). "
-                "Uses the project index to return paths that reference the target (instances, scripts, res:// refs)."
+                "Uses the project index to return paths that reference the target (instances, scripts, Assets/ refs)."
             ),
             parameters={
                 "type": "object",
                 "properties": {
-                    "res_path": {"type": "string", "description": "Target path, e.g. res://player.tscn or res://scripts/player.gd"},
+                    "res_path": {"type": "string", "description": "Target path, e.g. Assets/player.tscn or Assets/scripts/player.gd"},
                 },
                 "required": ["res_path"],
             },
             handler=_tool_find_references_to,
         ),
-        # --- Cursor parity + Godot-specific ---
+        # --- Cursor parity + Unity-specific ---
         ToolDef(
             name="get_recent_changes",
             description=(
-                "Deprecated. Edit history is persisted locally in the Godot plugin (GodotAIEditStore). "
+                "Deprecated. Edit history is persisted locally in the Unity plugin (UnityAIEditStore). "
                 "This backend returns an empty result."
             ),
             parameters={
@@ -829,7 +824,7 @@ def get_registered_tools() -> List[ToolDef]:
                 "properties": {
                     "pattern": {"type": "string", "description": "Regex pattern or literal text to search for (or use query as alias)."},
                     "query": {"type": "string", "description": "Alias for pattern."},
-                    "root_path": {"type": "string", "description": "Directory to search under.", "default": "res://"},
+                    "root_path": {"type": "string", "description": "Directory to search under.", "default": "Assets/"},
                     "extensions": {"type": "array", "items": {"type": "string"}, "description": "Filter by extension, e.g. ['.gd','.tscn'].", "default": []},
                     "max_matches": {"type": "integer", "description": "Max matches to return.", "default": 100, "minimum": 1, "maximum": 500},
                     "use_regex": {"type": "boolean", "description": "If true, pattern is a regex; else literal.", "default": True},
@@ -841,7 +836,7 @@ def get_registered_tools() -> List[ToolDef]:
         ToolDef(
             name="fetch_url",
             description=(
-                "Fetch the content of a URL via HTTP GET. Use to look up external documentation (e.g. Godot docs, API pages) "
+                "Fetch the content of a URL via HTTP GET. Use to look up external documentation (e.g. Unity docs, API pages) "
                 "when the user asks for docs or API info; this replaces searching an internal doc index."
             ),
             parameters={
@@ -855,7 +850,7 @@ def get_registered_tools() -> List[ToolDef]:
         ),
         ToolDef(
             name="run_terminal_command",
-            description="Run a shell command on the user's machine. Captures stdout, stderr, and exit code. Use for running scripts, godot --headless, or build commands.",
+            description="Run a shell command on the user's machine. Captures stdout, stderr, and exit code. Use for running scripts, unity --headless, or build commands.",
             parameters={
                 "type": "object",
                 "properties": {
@@ -867,29 +862,29 @@ def get_registered_tools() -> List[ToolDef]:
             handler=_tool_run_terminal_command,
         ),
         ToolDef(
-            name="run_godot_headless",
+            name="run_unity_headless",
             description=(
-                "Run Godot headlessly with a scene or script path. Captures stdout/stderr and exit code. "
+                "Run Unity headlessly with a scene or script path. Captures stdout/stderr and exit code. "
                 "Enables write-run-observe-fix loop. Use scene_path (or script_path as alias) to specify what to run."
             ),
             parameters={
                 "type": "object",
                 "properties": {
-                    "scene_path": {"type": "string", "description": "res:// path to scene or script to run (or use script_path as alias)."},
+                    "scene_path": {"type": "string", "description": "Assets/ path to scene or script to run (or use script_path as alias)."},
                     "script_path": {"type": "string", "description": "Alias for scene_path."},
                     "timeout_seconds": {"type": "integer", "description": "Max time to wait.", "default": 30, "minimum": 1, "maximum": 120},
                 },
                 "required": ["scene_path"],
             },
-            handler=_tool_run_godot_headless,
+            handler=_tool_run_unity_headless,
         ),
         ToolDef(
             name="run_scene",
-            description="Run a Godot scene headlessly and capture output/errors. Critical for test-driven agent loop.",
+            description="Run a Unity scene headlessly and capture output/errors. Critical for test-driven agent loop.",
             parameters={
                 "type": "object",
                 "properties": {
-                    "scene_path": {"type": "string", "description": "Project path starting with res:// (e.g., res://main.tscn)."},
+                    "scene_path": {"type": "string", "description": "Project path starting with Assets/ (e.g., Assets/main.tscn)."},
                     "timeout_seconds": {"type": "integer", "description": "Max time to wait.", "default": 30, "minimum": 1, "maximum": 120},
                 },
                 "required": ["scene_path"],
@@ -902,7 +897,7 @@ def get_registered_tools() -> List[ToolDef]:
             parameters={
                 "type": "object",
                 "properties": {
-                    "scene_path": {"type": "string", "description": "Optional. res://path/to/scene.tscn; omit for current open scene."},
+                    "scene_path": {"type": "string", "description": "Optional. Assets/path/to/scene.tscn; omit for current open scene."},
                 },
             },
             handler=_tool_get_node_tree,
@@ -911,13 +906,13 @@ def get_registered_tools() -> List[ToolDef]:
             name="get_signals",
             description=(
                 "List available signals for a node type or script (name, arguments). Use to reason about signal connections. "
-                "Provide at least one of node_type (built-in) or script_path (res:// to script)."
+                "Provide at least one of node_type (built-in) or script_path (Assets/ to script)."
             ),
             parameters={
                 "type": "object",
                 "properties": {
                     "node_type": {"type": "string", "description": "Built-in node type, e.g. Button, CharacterBody2D."},
-                    "script_path": {"type": "string", "description": "res:// path to script to inspect for signals."},
+                    "script_path": {"type": "string", "description": "Assets/ path to script to inspect for signals."},
                 },
             },
             handler=_tool_get_signals,
@@ -928,7 +923,7 @@ def get_registered_tools() -> List[ToolDef]:
             parameters={
                 "type": "object",
                 "properties": {
-                    "scene_path": {"type": "string", "description": "res:// path to the scene."},
+                    "scene_path": {"type": "string", "description": "Assets/ path to the scene."},
                     "node_path": {"type": "string", "description": "Path to the node in the scene."},
                     "signal_name": {"type": "string", "description": "Name of the signal."},
                     "callable_target": {"type": "string", "description": "Target node path and method, e.g. ../Player/on_clicked."},
@@ -943,7 +938,7 @@ def get_registered_tools() -> List[ToolDef]:
             parameters={
                 "type": "object",
                 "properties": {
-                    "script_path": {"type": "string", "description": "res:// path to script."},
+                    "script_path": {"type": "string", "description": "Assets/ path to script."},
                     "scene_path": {"type": "string", "description": "Scene path if inspecting a node's script."},
                     "node_path": {"type": "string", "description": "Node path in scene if inspecting attached script."},
                 },
@@ -953,7 +948,7 @@ def get_registered_tools() -> List[ToolDef]:
         ToolDef(
             name="search_asset_library",
             description=(
-                "Search the Godot Asset Library for addons/plugins by keyword. Returns asset title, author, support level, browse URL. "
+                "Search the Unity Asset Library for addons/plugins by keyword. Returns asset title, author, support level, browse URL. "
                 "Use when the user asks for a plugin or addon for a feature."
             ),
             parameters={
@@ -961,7 +956,7 @@ def get_registered_tools() -> List[ToolDef]:
                 "properties": {
                     "filter": {"type": "string", "description": "Search keyword (or use query as alias)."},
                     "query": {"type": "string", "description": "Alias for filter."},
-                    "godot_version": {"type": "string", "description": "Godot version filter.", "default": "4.2"},
+                    "unity_version": {"type": "string", "description": "Unity version filter.", "default": "4.2"},
                     "max_results": {"type": "integer", "description": "Max assets to return.", "default": 20, "minimum": 1, "maximum": 50},
                 },
                 "required": ["filter"],
@@ -970,25 +965,25 @@ def get_registered_tools() -> List[ToolDef]:
         ),
         ToolDef(
             name="get_project_settings",
-            description="Read project.godot settings (key-value by section). Use to see display, rendering, or other config.",
+            description="Read project.unity settings (key-value by section). Use to see display, rendering, or other config.",
             parameters={"type": "object", "properties": {}},
             handler=_tool_get_project_settings,
         ),
         ToolDef(
             name="get_autoloads",
-            description="List autoloaded singletons from project.godot (name and path). Agents need to know what is globally available.",
+            description="List autoloaded singletons from project.unity (name and path). Agents need to know what is globally available.",
             parameters={"type": "object", "properties": {}},
             handler=_tool_get_autoloads,
         ),
         ToolDef(
             name="get_input_map",
-            description="Read the input map from project.godot (action names and bound keys). Use when writing input handling code.",
+            description="Read the input map from project.unity (action names and bound keys). Use when writing input handling code.",
             parameters={"type": "object", "properties": {}},
             handler=_tool_get_input_map,
         ),
         ToolDef(
             name="check_errors",
-            description="Return the current editor Errors/Warnings panel content (script errors, etc.). Godot equivalent of linter output.",
+            description="Return the current editor Errors/Warnings panel content (script errors, etc.). Unity equivalent of linter output.",
             parameters={"type": "object", "properties": {}},
             handler=_tool_check_errors,
         ),

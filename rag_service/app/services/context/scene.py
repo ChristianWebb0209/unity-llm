@@ -14,8 +14,8 @@ _RE_TSCN_SCRIPT_REF = re.compile(r'^\s*script\s*=\s*ExtResource\s*\(\s*["\']?([^
 
 def parse_tscn_script_paths(tscn_text: str) -> List[str]:
     """
-    Extract script paths from a .tscn file (res://... paths).
-    Parses [ext_resource type="Script" path="res://..." id="N"] and script = ExtResource("N").
+    Extract script paths from a .tscn file (Assets/... paths).
+    Parses [ext_resource type="Script" path="Assets/..." id="N"] and script = ExtResource("N").
     """
     ext_resources: dict = {}
     current_section: Optional[str] = None
@@ -26,7 +26,7 @@ def parse_tscn_script_paths(tscn_text: str) -> List[str]:
         if line.startswith("[") and line.endswith("]"):
             current_section = line
             if "ext_resource" in current_section and "Script" in current_section:
-                path_m = re.search(r'path="(res://[^"]+\.(?:gd|cs))"', current_section)
+                path_m = re.search(r'path="(Assets/[^"]+\.(?:gd|cs))"', current_section)
                 id_m = re.search(r'\bid="([^"]+)"', current_section)
                 if path_m and id_m:
                     ext_resources[id_m.group(1)] = path_m.group(1)
@@ -51,7 +51,7 @@ def parse_tscn_script_paths(tscn_text: str) -> List[str]:
 def extract_extends_from_script(text: str, language: str = "gdscript") -> Optional[str]:
     """
     Extract extends/class base type from script content.
-    GDScript: extends Node2D; C#: class Foo : CharacterBody2D or Godot.CharacterBody2D.
+    GDScript: extends Node2D; C#: class Foo : CharacterBody2D or Unity.CharacterBody2D.
     Returns base type string (e.g. CharacterBody2D) or None.
     """
     if not text or not text.strip():
@@ -65,7 +65,7 @@ def extract_extends_from_script(text: str, language: str = "gdscript") -> Option
             )
             if m:
                 base = m.group(1).strip()
-                if base.startswith("Godot."):
+                if base.startswith("Unity."):
                     return base[6:].strip()
                 return base
         return None
@@ -73,7 +73,7 @@ def extract_extends_from_script(text: str, language: str = "gdscript") -> Option
         m = re.match(r'^\s*extends\s+([A-Za-z0-9_".]+)', ln)
         if m:
             base = m.group(1).strip().strip('"')
-            if base.startswith("res://"):
+            if base.startswith("Assets/"):
                 return None
             return base
     return None

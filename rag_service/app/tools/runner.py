@@ -5,7 +5,7 @@ otherwise delegates to dispatch_tool_call (e.g. execute_on_client for the plugin
 """
 from typing import Any, Dict
 
-from .deps import GodotQueryDeps
+from .deps import UnityQueryDeps
 from .definitions import dispatch_tool_call
 from ..services.context import (
     append_project_file,
@@ -13,7 +13,7 @@ from ..services.context import (
     apply_project_patch_unified,
     grep_project_files,
     list_project_directory,
-    read_project_godot_ini,
+    read_project_unity_ini,
     search_project_files,
     write_project_file,
 )
@@ -21,7 +21,7 @@ from ..services.context.context_builder import list_project_files, read_project_
 from ..services.repo_indexing import get_inbound_refs, list_indexed_paths
 
 
-def execute_tool(name: str, arguments: Dict[str, Any], deps: GodotQueryDeps) -> Any:
+def execute_tool(name: str, arguments: Dict[str, Any], deps: UnityQueryDeps) -> Any:
     """
     Execute a tool by name with the given arguments and request-scoped deps.
     When deps.project_root_abs is set, runs backend logic for supported tools;
@@ -35,7 +35,7 @@ def execute_tool(name: str, arguments: Dict[str, Any], deps: GodotQueryDeps) -> 
     if name == "read_file" and project_root_abs:
         path = (args_dict.get("path") or "").strip()
         if path:
-            cache_key = (path if path.startswith("res://") else "res://" + path.lstrip("/")).replace("\\", "/")
+            cache_key = (path if path.startswith("Assets/") else "Assets/" + path.lstrip("/")).replace("\\", "/")
             if cache_key in read_file_cache:
                 content = read_file_cache[cache_key]
                 return {
@@ -56,7 +56,7 @@ def execute_tool(name: str, arguments: Dict[str, Any], deps: GodotQueryDeps) -> 
         return dispatch_tool_call(name, args_dict)
 
     if name == "list_files" and project_root_abs:
-        path = (args_dict.get("path") or "res://").strip() or "res://"
+        path = (args_dict.get("path") or "Assets/").strip() or "Assets/"
         recursive = bool(args_dict.get("recursive", True))
         extensions = args_dict.get("extensions") or []
         max_entries = min(2000, max(1, int(args_dict.get("max_entries", 500))))
@@ -86,7 +86,7 @@ def execute_tool(name: str, arguments: Dict[str, Any], deps: GodotQueryDeps) -> 
         return dispatch_tool_call(name, args_dict)
 
     if name == "list_directory" and project_root_abs:
-        path = (args_dict.get("path") or "res://").strip() or "res://"
+        path = (args_dict.get("path") or "Assets/").strip() or "Assets/"
         recursive = bool(args_dict.get("recursive", False))
         max_entries = min(2000, max(1, int(args_dict.get("max_entries", 250))))
         max_depth = min(20, max(0, int(args_dict.get("max_depth", 6))))
@@ -105,7 +105,7 @@ def execute_tool(name: str, arguments: Dict[str, Any], deps: GodotQueryDeps) -> 
         query = (args_dict.get("query") or "").strip()
         if not query:
             return dispatch_tool_call(name, args_dict)
-        root_path = (args_dict.get("root_path") or "res://").strip() or "res://"
+        root_path = (args_dict.get("root_path") or "Assets/").strip() or "Assets/"
         extensions = args_dict.get("extensions") or []
         max_matches = min(500, max(1, int(args_dict.get("max_matches", 50))))
         results = search_project_files(
@@ -127,7 +127,7 @@ def execute_tool(name: str, arguments: Dict[str, Any], deps: GodotQueryDeps) -> 
                 "error": "Repo indexing tools are disabled in this environment (ENABLE_REPO_INDEXING=0). You cannot list project structure."
             }
 
-        prefix = (args_dict.get("prefix") or "res://").strip() or "res://"
+        prefix = (args_dict.get("prefix") or "Assets/").strip() or "Assets/"
         max_paths = min(1000, max(1, int(args_dict.get("max_paths", 300))))
         max_depth_arg = args_dict.get("max_depth")
         max_depth = int(max_depth_arg) if max_depth_arg is not None else None
@@ -149,7 +149,7 @@ def execute_tool(name: str, arguments: Dict[str, Any], deps: GodotQueryDeps) -> 
             return dispatch_tool_call(name, args_dict)
         query = "extends " + extends_class
         results = search_project_files(
-            project_root_abs, query, root_path="res://",
+            project_root_abs, query, root_path="Assets/",
             extensions=[".gd", ".cs"], max_matches=30,
         )
         paths = [r["path"] for r in results]
@@ -183,7 +183,7 @@ def execute_tool(name: str, arguments: Dict[str, Any], deps: GodotQueryDeps) -> 
         pattern = str(args_dict.get("pattern") or args_dict.get("query") or "").strip()
         if not pattern:
             return dispatch_tool_call(name, args_dict)
-        root_path = (args_dict.get("root_path") or "res://").strip() or "res://"
+        root_path = (args_dict.get("root_path") or "Assets/").strip() or "Assets/"
         extensions = args_dict.get("extensions") or []
         max_matches = min(500, max(1, int(args_dict.get("max_matches", 100))))
         use_regex = bool(args_dict.get("use_regex", True))
@@ -203,30 +203,30 @@ def execute_tool(name: str, arguments: Dict[str, Any], deps: GodotQueryDeps) -> 
         }
 
     if name == "get_project_settings" and project_root_abs:
-        ini = read_project_godot_ini(project_root_abs)
+        ini = read_project_unity_ini(project_root_abs)
         return {
             "success": True,
-            "message": "Project settings (project.godot sections).",
+            "message": "Project settings (project.unity sections).",
             "sections": {k: v for k, v in ini.items()},
         }
 
     if name == "get_autoloads" and project_root_abs:
-        ini = read_project_godot_ini(project_root_abs)
+        ini = read_project_unity_ini(project_root_abs)
         autoload = ini.get("autoload", {})
         items = [{"name": k, "path": v} for k, v in autoload.items()]
         return {
             "success": True,
-            "message": "Autoloads from project.godot.",
+            "message": "Autoloads from project.unity.",
             "autoloads": items,
         }
 
     if name == "get_input_map" and project_root_abs:
-        ini = read_project_godot_ini(project_root_abs)
+        ini = read_project_unity_ini(project_root_abs)
         inp = ini.get("input", {})
         items = [{"action": k, "events": v} for k, v in inp.items()]
         return {
             "success": True,
-            "message": "Input map from project.godot.",
+            "message": "Input map from project.unity.",
             "input_map": items,
         }
 
