@@ -303,7 +303,7 @@ def build_trainer(tokenizer: AutoTokenizer, model: AutoModelForCausalLM, dataset
 
     training_args = TrainingArguments(
         output_dir=output_dir,
-        per_device_train_batch_size=3,
+        per_device_train_batch_size=2,
         per_device_eval_batch_size=1,
         gradient_accumulation_steps=2,
         num_train_epochs=1,
@@ -327,7 +327,8 @@ def build_trainer(tokenizer: AutoTokenizer, model: AutoModelForCausalLM, dataset
         train_dataset=dataset["train"],
         eval_dataset=dataset["val"],
         dataset_text_field="text",
-        max_seq_length=1024,
+        # Colab GPU memory is tight; keep sequence length conservative.
+        max_seq_length=512,
         args=training_args,
     )
     return trainer
